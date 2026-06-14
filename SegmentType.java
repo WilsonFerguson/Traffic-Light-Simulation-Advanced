@@ -1,0 +1,4 @@
+enum SegmentType {
+    STRAIGHT,
+    BEZIER,
+}
