@@ -135,6 +135,26 @@ public class PVector {
     }
 
     /**
+     * Divides each component of the vector by the corresponding component in the
+     * given {@code PVector} vector. If any component in the vector is zero, then
+     * that component is ignored.
+     *
+     * @param vector
+     */
+    public PVector div(PVector vector) {
+        if (vector.x != 0) {
+            x /= vector.x;
+        }
+        if (vector.y != 0) {
+            y /= vector.y;
+        }
+        if (vector.z != 0) {
+            z /= vector.z;
+        }
+        return this;
+    }
+
+    /**
      * Normalizes the {@code PVector} p.
      * 
      */
@@ -184,6 +204,16 @@ public class PVector {
     public float heading() {
         // Returns the angle of the vector
         return MathHelper.atan2(y, x);
+    }
+
+    /**
+     * Returns a new {@code PVector} where the absoulte value has been taken of each
+     * component.
+     * 
+     * @return PVector
+     */
+    public PVector abs() {
+        return new PVector(Math.abs(x), Math.abs(y), Math.abs(z));
     }
 
     /**
@@ -518,6 +548,39 @@ public class PVector {
     }
 
     /**
+     * Returns {@code String} representation of this vector rounded to the nearest
+     * integer.
+     *
+     * @return String
+     */
+    public String toIntString() {
+        if (z == 0) {
+            return "(" + Math.round(x) + ", " + Math.round(y) + ")";
+        }
+
+        return "(" + Math.round(x) + ", " + Math.round(y) + ", " + Math.round(z) + ")";
+    }
+
+    /**
+     * Returns a parsed {@code PVector} from a {@code String} representation.
+     * 
+     * @param vectorString
+     * @return PVector
+     */
+    public static PVector parseString(String vectorString) {
+        vectorString = vectorString.replace("(", "").replace(")", "");
+        String[] parts = vectorString.split(",");
+        if (parts.length == 2) {
+            return new PVector(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
+        } else if (parts.length == 3) {
+            return new PVector(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()),
+                    Double.parseDouble(parts[2].trim()));
+        } else {
+            throw new IllegalArgumentException("Invalid PVector string format: " + vectorString);
+        }
+    }
+
+    /**
      * Static method to add {@code PVector} vector1 and {@code PVector} vector2.
      * 
      * @param vector1
@@ -571,6 +634,20 @@ public class PVector {
         PVector p = vector.copy();
         p.div(divisor);
         return p;
+    }
+
+    /**
+     * Static method to divide {@code PVector} vector by {@code PVector} vector2.
+     * 
+     * @param vector1
+     * @param vector2
+     * @return PVector
+     */
+    public static PVector div(PVector vector1, PVector vector2) {
+        PVector p1 = vector1.copy();
+        PVector p2 = vector2.copy();
+        p1.div(p2);
+        return p1;
     }
 
     /**

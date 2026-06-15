@@ -879,19 +879,23 @@ public class PFunctions implements PConstants {
     }
 
     public float parseFloat(String s) {
+        if (s.isEmpty())
+            return 0;
         return Float.parseFloat(s);
     }
 
     public float parseFloat(Object o) {
-        return Float.parseFloat(o.toString());
+        return parseFloat(o.toString());
     }
 
     public double parseDouble(String s) {
+        if (s.isEmpty())
+            return 0;
         return Double.parseDouble(s);
     }
 
     public double parseDouble(Object o) {
-        return Double.parseDouble(o.toString());
+        return parseDouble(o.toString());
     }
 
     public double parseDouble(boolean b) {
@@ -943,11 +947,13 @@ public class PFunctions implements PConstants {
     }
 
     public int parseInt(String s) {
+        if (s.isEmpty())
+            return 0;
         return Integer.parseInt(s);
     }
 
     public int parseInt(Object o) {
-        return Integer.parseInt(o.toString());
+        return parseInt(o.toString());
     }
 
     public String str(boolean b) {
@@ -1378,6 +1384,18 @@ public class PFunctions implements PConstants {
         return Lerp.lerpSmooth(start, stop, amt);
     }
 
+    public float lerpSuperSmooth(double start, double stop, double amt) {
+        return Lerp.lerpSuperSmooth(start, stop, amt);
+    }
+
+    public float lerpConstantAcceleration(double start, double stop, double amt) {
+        return Lerp.lerpConstantAcceleration(start, stop, amt);
+    }
+
+    public float lerpConstantDeceleration(double start, double stop, double amt) {
+        return Lerp.lerpConstantDeceleration(start, stop, amt);
+    }
+
     public float lerpOvershoot(double start, double stop, double amt) {
         return Lerp.lerpOvershoot(start, stop, amt);
     }
@@ -1596,157 +1614,6 @@ public class PFunctions implements PConstants {
         return (float) (new Random().nextGaussian());
     }
 
-    // Shuffle
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public char[] shuffle(char[] array) {
-        char[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            char temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public byte[] shuffle(byte[] array) {
-        byte[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            byte temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public int[] shuffle(int[] array) {
-        int[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            int temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public long[] shuffle(long[] array) {
-        long[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            long temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public float[] shuffle(float[] array) {
-        float[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            float temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public double[] shuffle(double[] array) {
-        double[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            double temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public boolean[] shuffle(boolean[] array) {
-        boolean[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            boolean temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public String[] shuffle(String[] array) {
-        String[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            String temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public PVector[] shuffle(PVector[] array) {
-        PVector[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            PVector temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public Object[] shuffle(Object[] array) {
-        Object[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            Object temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
     // color
     public color color(Color color) {
         return new color(color);
@@ -1805,12 +1672,12 @@ public class PFunctions implements PConstants {
     }
 
     public float saturation(color color) {
-        float[] hsb = color.RGBtoHSB();
+        float[] hsb = color.getHSB();
         return hsb[1];
     }
 
     public float hue(color color) {
-        float[] hsb = color.RGBtoHSB();
+        float[] hsb = color.getHSB();
         return hsb[0];
     }
 

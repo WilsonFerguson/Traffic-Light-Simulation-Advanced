@@ -29,4 +29,11 @@ class Settings extends PFunctions {
     public static color segmentColorBike = new color(189, 74, 66);
     public static color segmentColorPedestrian = new color(75);
     public static color segmentColorOV = new color(128);
+
+    public static color buttonDefault = new color(62, 94, 171, 150);
+    public static color buttonHover = new color(77, 109, 186, 150);
+    public static color buttonActive = new color(52, 84, 161, 150);
+    public static color buttonAccentDefault = new color(70, 219, 75, 150);
+    public static color buttonAccentHover = new color(85, 234, 90, 150);
+    public static color buttonAccentActive = new color(60, 209, 65, 150);
 }

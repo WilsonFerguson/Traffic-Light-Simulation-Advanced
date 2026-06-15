@@ -10,6 +10,18 @@ class Sketch extends Applet {
 
         builder = new Builder();
         exitOnEscape(false);
+
+        Panel.setDefaults(new PVector(width / 5, height / 5), color(62, 94, 171, 150), color(0, 150));
+        InputField.setDefaults(
+                new InputField(new PVector(width / 2, height / 2), new PVector(width / 8, width / 24),
+                        Settings.buttonDefault, Settings.buttonHover, Settings.buttonActive,
+                        color(0, 150), "", 20, color(255)).setCornerRadius(0));
+        Button.setDefaults(
+                new Button(new PVector(width / 2, height / 2), new PVector(width / 8, width / 24),
+                        Settings.buttonDefault, Settings.buttonHover, Settings.buttonActive,
+                        color(0, 150), "yeet", 20, color(255)).setCornerRadius(0));
+        Text.setDefaults(20, color(255));
+        ColorPicker.setDefaults(new PVector(width / 8, width / 8), color(255));
     }
 
     public void draw() {

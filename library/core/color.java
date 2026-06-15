@@ -49,8 +49,10 @@ public class color {
      */
     public color(String c) {
         c = c.toLowerCase().trim().replace(" ", "");
-        int openParenIndex = c.indexOf('(');
-        c = c.substring(openParenIndex + 1, c.length() - 1);
+        if (c.contains("(")) {
+            int openParenIndex = c.indexOf('(');
+            c = c.substring(openParenIndex + 1, c.length() - 1);
+        }
 
         String[] stringValues = c.split(",");
         double[] values = new double[stringValues.length];
@@ -86,8 +88,11 @@ public class color {
         return new color((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, (c >> 24) & 0xFF);
     }
 
-    public static color fromHSB(double h, double s, double b) {
-        Color c = Color.getHSBColor((float) h, (float) s, (float) b);
+    /**
+     * Generates a color from HSB. hue, saturation, and brightness are from 0 to 1.
+     */
+    public static color fromHSB(double hue, double saturation, double brightness) {
+        Color c = Color.getHSBColor((float) hue, (float) saturation, (float) brightness);
         return new color(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha());
     }
 
@@ -140,24 +145,245 @@ public class color {
         return this;
     }
 
-    float[] RGBtoHSB() {
-        Color c = new Color(r, g, b);
-        float[] hsb = Color.RGBtoHSB(c.getRed(), c.getGreen(), c.getBlue(), null);
-        return hsb;
+    /**
+     * Sets the brightness of the color. Note: The brightness is in the range 0-1.
+     */
+    public color setBrightness(double brightness) {
+        float[] hsb = getHSB();
+        Color c = Color.getHSBColor(hsb[0], hsb[1], (float) brightness);
+        this.r = c.getRed();
+        this.g = c.getGreen();
+        this.b = c.getBlue();
+        return this;
+    }
+
+    /**
+     * Constrains the RGBA values to be between 0 and 255.
+     */
+    public color constrain() {
+        this.r = (int) MathHelper.constrain(r, 0, 255);
+        this.g = (int) MathHelper.constrain(g, 0, 255);
+        this.b = (int) MathHelper.constrain(b, 0, 255);
+        this.a = (int) MathHelper.constrain(a, 0, 255);
+        return this;
+    }
+
+    /**
+     * Adds the RGBA values of the given color to this color. Then constrains this
+     * color's values from 0 to 255.
+     */
+    public color add(color c) {
+        this.r += c.r;
+        this.g += c.g;
+        this.b += c.b;
+        this.a += c.a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Adds the given RGBA values to this color. Then constrains this color's values
+     * from 0 to 255.
+     */
+    public color add(double r, double g, double b, double a) {
+        this.r += r;
+        this.g += g;
+        this.b += b;
+        this.a += a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Adds the given RGB values to this color. Then constrains this color's values
+     * from 0 to 255.
+     */
+    public color add(double r, double g, double b) {
+        return add(r, g, b, 0);
+    }
+
+    /**
+     * Adds a value to all RGB values. Adds an alpha to the alpha channel. Then
+     * constrains this color's values from 0 to 255.
+     */
+    public color add(double value, double a) {
+        return add(value, value, value, a);
+    }
+
+    /**
+     * Adds a value to all RGB values. Then constrains this color's values from 0 to
+     * 255.
+     */
+    public color add(double value) {
+        return add(value, 0);
+    }
+
+    /**
+     * Subtracts the RGBA values of the given color from this color. Then constrains
+     * this color's values from 0 to 255.
+     */
+    public color sub(color c) {
+        this.r -= c.r;
+        this.g -= c.g;
+        this.b -= c.b;
+        this.a -= c.a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Subtracts the given RGBA values from this color. Then constrains this color's
+     * values from 0 to 255.
+     */
+    public color sub(double r, double g, double b, double a) {
+        this.r -= r;
+        this.g -= g;
+        this.b -= b;
+        this.a -= a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Subtracts the given RGB values from this color. Then constrains this color's
+     * values from 0 to 255.
+     */
+    public color sub(double r, double g, double b) {
+        return sub(r, g, b, 0);
+    }
+
+    /**
+     * Subtracts a value from all RGB values. Subtracts an alpha from the alpha
+     * channel. Then constrains this color's values from 0 to 255.
+     */
+    public color sub(double value, double a) {
+        return sub(value, value, value, a);
+    }
+
+    /**
+     * Subtracts a value from all RGB values. Then constrains this color's values
+     * from 0 to 255.
+     */
+    public color sub(double value) {
+        return sub(value, 0);
+    }
+
+    /**
+     * Multiplies the RGBA values of this color by the RGBA values of the given
+     * color. Then constrains this color's values from 0 to 255.
+     */
+    public color mult(color c) {
+        this.r *= c.r;
+        this.g *= c.g;
+        this.b *= c.b;
+        this.a *= c.a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Multiplies the RGBA values of this color by the given RGBA values. Then
+     * constrains this color's values from 0 to 255.
+     */
+    public color mult(double r, double g, double b, double a) {
+        this.r *= r;
+        this.g *= g;
+        this.b *= b;
+        this.a *= a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Multiplies the RGB values of this color by the given RGB values. Then
+     * constrains this color's values from 0 to 255.
+     */
+    public color mult(double r, double g, double b) {
+        return mult(r, g, b, 1);
+    }
+
+    /**
+     * Multiplies all RGB values by a value. Multiplies the alpha channel by a
+     * value. Then constrains this color's values from 0 to 255.
+     */
+    public color mult(double value, double a) {
+        return mult(value, value, value, a);
+    }
+
+    /**
+     * Multiplies all RGB values by a value. Then constrains this color's values
+     * from 0 to 255.
+     */
+    public color mult(double value) {
+        return mult(value, 1);
+    }
+
+    /**
+     * Divides the RGBA values of this color by the RGBA values of the given color.
+     * Then constrains this color's values from 0 to 255.
+     */
+    public color div(color c) {
+        this.r /= c.r;
+        this.g /= c.g;
+        this.b /= c.b;
+        this.a /= c.a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Divides the RGBA values of this color by the given RGBA values. Then
+     * constrains this color's values from 0 to 255.
+     */
+    public color div(double r, double g, double b, double a) {
+        this.r /= r;
+        this.g /= g;
+        this.b /= b;
+        this.a /= a;
+        constrain();
+        return this;
+    }
+
+    /**
+     * Divides the RGB values of this color by the given RGB values. Then constrains
+     * this color's values from 0 to 255.
+     */
+    public color div(double r, double g, double b) {
+        return div(r, g, b, 1);
+    }
+
+    /**
+     * Divides all RGB values by a value. Divides the alpha channel by a value. Then
+     * constrains this color's values from 0 to 255.
+     */
+    public color div(double value, double a) {
+        return div(value, value, value, a);
+    }
+
+    /**
+     * Divides all RGB values by a value. Then constrains this color's values from 0
+     * to 255.
+     */
+    public color div(double value) {
+        return div(value, 1);
+    }
+
+    public float[] getHSB() {
+        return Color.RGBtoHSB(r, g, b, null);
     }
 
     public float getHue() {
-        float[] hsb = RGBtoHSB();
+        float[] hsb = getHSB();
         return hsb[0];
     }
 
     public float getSaturation() {
-        float[] hsb = RGBtoHSB();
+        float[] hsb = getHSB();
         return hsb[1];
     }
 
     public float getBrightness() {
-        float[] hsb = RGBtoHSB();
+        float[] hsb = getHSB();
         return hsb[2];
     }
 
@@ -181,7 +407,7 @@ public class color {
      * Returns a random color. RGB values are between 100 and 255.
      */
     public static color randomColor() {
-        return new color(MathHelper.random(100, 255), MathHelper.random(100, 255), MathHelper.random(100, 255));
+        return color.fromHSB(MathHelper.random(0, 1), MathHelper.random(0.6, 0.85), MathHelper.random(0.6, 0.9));
     }
 
 }

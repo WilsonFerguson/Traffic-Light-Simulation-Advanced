@@ -290,14 +290,6 @@ class Builder extends PComponent {
 
                 return;
             } else if (!hoveringSegmentRelevance() && hoveredAnchor != null) {
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
-                // THINGS ARE GETTING INTO INFINITE LOOP HERE
                 selectAnchor(hoveredAnchor);
                 currentSegment.setEndAnchor(currentAnchor);
                 float heading = currentSegment.getStraightHeading();
@@ -306,14 +298,22 @@ class Builder extends PComponent {
                     currentSegment.setPreviousEndHeading(heading);
                     currentSegment.updatePath(true);
                 }
+                boolean updatedHeading = false;
+                for (Segment segment : currentAnchor.beginSegments) {
+                    currentSegment.addSegmentNext(segment);
+                    if (!updatedHeading && currentSegment.type == SegmentType.BEZIER) {
+                        currentSegment.setEndControlPoint(segment.startHeading, segment.startControlPointMag);
+                        currentSegment.updatePath(true);
+                        updatedHeading = true;
+                    }
+                }
 
                 Segment previous = currentSegment;
                 segmentPlaced = false;
 
                 newSegment(cursor.pos, currentSegment.getStraightHeading());
-                currentSegment.addSegmentPrevious(previous);
-                for (Segment segment : currentAnchor.beginSegments) {
-                    currentSegment.addSegmentNext(segment);
+                for (Segment segment : currentAnchor.endSegments) {
+                    currentSegment.addSegmentPrevious(segment);
                 }
                 currentSegment.setType(previous.type);
                 if (previous.endHeading != -Float.MIN_VALUE)

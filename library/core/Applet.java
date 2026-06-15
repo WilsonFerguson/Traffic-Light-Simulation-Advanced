@@ -32,7 +32,7 @@ public class Applet extends JPanel implements PConstants, Runnable {
 
     public color[] pixels;
     private boolean hasDrawnSinceLoadPixels = true; // If false, loadPixels() will not do anything because it doesn't
-                                                    // need to update anything new. Initially true to load the pixels
+                                                    // need to update anything new
 
     // Alignment modes
     private int rectMode = CORNER;
@@ -3066,6 +3066,10 @@ public class Applet extends JPanel implements PConstants, Runnable {
         return Lerp.lerpSmooth(start, stop, amt);
     }
 
+    public float lerpSuperSmooth(double start, double stop, double amt) {
+        return Lerp.lerpSuperSmooth(start, stop, amt);
+    }
+
     public float lerpOvershoot(double start, double stop, double amt) {
         return Lerp.lerpOvershoot(start, stop, amt);
     }
@@ -3284,157 +3288,6 @@ public class Applet extends JPanel implements PConstants, Runnable {
         return (float) (new Random().nextGaussian());
     }
 
-    // Shuffle
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public char[] shuffle(char[] array) {
-        char[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            char temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public byte[] shuffle(byte[] array) {
-        byte[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            byte temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public int[] shuffle(int[] array) {
-        int[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            int temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public long[] shuffle(long[] array) {
-        long[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            long temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public float[] shuffle(float[] array) {
-        float[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            float temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public double[] shuffle(double[] array) {
-        double[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            double temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public boolean[] shuffle(boolean[] array) {
-        boolean[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            boolean temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public String[] shuffle(String[] array) {
-        String[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            String temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public PVector[] shuffle(PVector[] array) {
-        PVector[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            PVector temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
-    /**
-     * Returns a randomized copy of the array.
-     */
-    public Object[] shuffle(Object[] array) {
-        Object[] shuffled = array.clone();
-        Random random = new Random();
-        for (int i = shuffled.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            Object temp = shuffled[index];
-            shuffled[index] = shuffled[i];
-            shuffled[i] = temp;
-        }
-        return shuffled;
-    }
-
     // Noise Functions
     // TODO Implement rest of noise functions
     public float noise(double x, double y, double z, double w) {
@@ -3580,12 +3433,12 @@ public class Applet extends JPanel implements PConstants, Runnable {
     }
 
     public float saturation(color color) {
-        float[] hsb = color.RGBtoHSB();
+        float[] hsb = color.getHSB();
         return hsb[1];
     }
 
     public float hue(color color) {
-        float[] hsb = color.RGBtoHSB();
+        float[] hsb = color.getHSB();
         return hsb[0];
     }
 

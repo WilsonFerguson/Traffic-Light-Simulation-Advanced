@@ -32,4 +32,17 @@ public enum TextAlignment {
         }
     }
 
+    public static TextAlignment fromString(String str) {
+        switch (str.toLowerCase()) {
+            case "center":
+                return CENTER;
+            case "left":
+                return LEFT;
+            case "right":
+                return RIGHT;
+            default:
+                return LEFT;
+        }
+    }
+
 }
