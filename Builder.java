@@ -6,15 +6,18 @@ class Builder extends PComponent {
     ArrayList<Anchor> anchors;
     ArrayList<Segment> segments;
 
+    Sketch sketch;
     Cursor cursor;
 
     Anchor currentAnchor;
     Segment currentSegment;
     boolean segmentPlaced;
 
-    public Builder() {
+    public Builder(Sketch sketch) {
         anchors = new ArrayList<Anchor>();
         segments = new ArrayList<Segment>();
+
+        this.sketch = sketch;
 
         currentAnchor = null;
         currentSegment = null;
@@ -30,7 +33,7 @@ class Builder extends PComponent {
             if (!segmentPlaced) {
                 currentSegment.setEnd(cursor.pos);
                 currentSegment.setEndHeading(
-                        PVector.sub(currentSegment.getFinalNode(), currentSegment.getStartNode()).heading(), true);
+                        PVector.sub(currentSegment.getEndNode(), currentSegment.getStartNode()).heading(), true);
                 currentSegment.updatePath(true);
             }
 
@@ -41,8 +44,8 @@ class Builder extends PComponent {
                 currentSegment.updatePath(true);
             }
             if (cursor.selectedEndControlPoint != null) {
-                float heading = PVector.sub(currentSegment.getFinalNode(), cursor.pos).heading();
-                float mag = PVector.sub(cursor.pos, currentSegment.getFinalNode()).mag();
+                float heading = PVector.sub(currentSegment.getEndNode(), cursor.pos).heading();
+                float mag = PVector.sub(cursor.pos, currentSegment.getEndNode()).mag();
                 cursor.selectedEndControlPoint.setEndControlPoint(heading, mag);
                 currentSegment.updatePath(true);
             }
@@ -51,15 +54,17 @@ class Builder extends PComponent {
     }
 
     public void show() {
-        if (Settings.drawAnchors) {
-            for (Anchor anchor : anchors) {
-                anchor.show();
-            }
-        }
         for (Segment segment : segments) {
             if (segment == currentSegment)
                 continue;
             segment.show();
+        }
+        if (!sketch.running) {
+            if (Settings.drawAnchors) {
+                for (Anchor anchor : anchors) {
+                    anchor.show();
+                }
+            }
         }
 
         if (currentAnchor != null) {
@@ -68,7 +73,7 @@ class Builder extends PComponent {
         if (currentSegment != null) {
             currentSegment.showSelected();
         }
-        if (currentAnchor == null) {
+        if (currentAnchor == null && !sketch.running) {
             cursor.show();
         }
     }
@@ -124,7 +129,17 @@ class Builder extends PComponent {
                 && cursor.pos.dist(currentSegment.getEndControlPoint()) < Settings.sizeAnchor / 2)
             return true;
 
+        if (hoveringSegmentInfo())
+            return true;
+
         return currentSegment.hovering();
+    }
+
+    public boolean hoveringSegmentInfo() {
+        if (currentSegment == null)
+            return false;
+
+        return (currentSegment.segmentEditorPanel.isActive() && currentSegment.segmentEditorPanel.hover());
     }
 
     public Anchor getHoveredAnchor() {
@@ -138,6 +153,26 @@ class Builder extends PComponent {
 
     public Segment getHoveredSegment() {
         for (Segment segment : segments) {
+            if (segment.hovering())
+                return segment;
+        }
+
+        return null;
+    }
+
+    public Segment getHoveredSegment(Segment... excludedSegments) {
+        for (Segment segment : segments) {
+            boolean cancel = false;
+            if (excludedSegments.length > 0) {
+                for (Segment excluded : excludedSegments) {
+                    if (excluded == segment) {
+                        cancel = true;
+                        break;
+                    }
+                }
+            }
+            if (cancel)
+                continue;
             if (segment.hovering())
                 return segment;
         }
@@ -177,6 +212,12 @@ class Builder extends PComponent {
             segment.controlledRightEnd.remove(currentSegment);
             segment.controlledFullLeft.remove(currentSegment);
             segment.controlledFullRight.remove(currentSegment);
+        }
+        for (Segment segment : currentSegment.segmentsNext) {
+            segment.segmentsPrevious.remove(currentSegment);
+        }
+        for (Segment segment : currentSegment.segmentsPrevious) {
+            segment.segmentsNext.remove(currentSegment);
         }
 
         if (currentSegment.startAnchor != null)
@@ -227,6 +268,9 @@ class Builder extends PComponent {
     }
 
     public void mouseClicked() {
+        if (mouseButton != LEFT || sketch.running)
+            return;
+
         // Make brand new segment that starts a path
         Anchor hoveredAnchor = getHoveredAnchor();
         Segment hoveredSegment = getHoveredSegment();
@@ -260,6 +304,8 @@ class Builder extends PComponent {
                     currentSegment.addSegmentPrevious(previous);
                 }
                 currentSegment.setType(previousFirst.type);
+                currentSegment.setTrafficType(previousFirst.trafficType);
+                currentSegment.setPriority(previousFirst.priority);
                 if (previousFirst.endHeading != -Float.MIN_VALUE)
                     currentSegment.setStartHeading(previousFirst.endHeading, true);
 
@@ -271,7 +317,10 @@ class Builder extends PComponent {
 
         // Make new segment that continues path
         if (currentSegment != null && !segmentPlaced) {
-            if (!hoveringSegmentRelevance() && hoveredAnchor == null) {
+            if (!hoveringSegmentInfo() && hoveredAnchor == null) {
+                Segment hovered = getHoveredSegment(currentSegment);
+                Segment comingIn = currentSegment;
+
                 finishOffCurrentSegment();
                 Segment previous = currentSegment;
                 segmentPlaced = false;
@@ -285,11 +334,39 @@ class Builder extends PComponent {
 
                 currentSegment.addSegmentPrevious(previous);
                 currentSegment.setType(previous.type);
+                currentSegment.setTrafficType(previous.trafficType);
+                currentSegment.setPriority(previous.priority);
                 if (previous.endHeading != -Float.MIN_VALUE)
                     currentSegment.setStartHeading(previous.endHeading, true);
 
+                // If we are hovering a pre-existing segment, then we need to split that one
+                if (hovered != null) {
+                    Segment copy = hovered.copy();
+                    // Hovered segment will be the first segment
+                    hovered.addSegmentNext(copy);
+                    hovered.setClosingSegment(false);
+                    copy.setOpeningSegment(false);
+
+                    hovered.endAnchor.endSegments.remove(hovered);
+                    hovered.endAnchor.endSegments.add(copy);
+                    hovered.endAnchor = currentAnchor;
+                    currentAnchor.endSegments.add(hovered);
+                    copy.startAnchor = currentAnchor;
+                    currentAnchor.beginSegments.add(copy);
+
+                    hovered.setEndNode(currentSegment.getEndNode());
+                    copy.setStartNode(currentSegment.getStartNode());
+
+                    comingIn.addSegmentNext(copy);
+
+                    hovered.updatePath(false);
+                    copy.updatePath(false);
+
+                    segments.add(copy);
+                }
+
                 return;
-            } else if (!hoveringSegmentRelevance() && hoveredAnchor != null) {
+            } else if (!hoveringSegmentInfo() && hoveredAnchor != null) {
                 selectAnchor(hoveredAnchor);
                 currentSegment.setEndAnchor(currentAnchor);
                 float heading = currentSegment.getStraightHeading();
@@ -316,6 +393,8 @@ class Builder extends PComponent {
                     currentSegment.addSegmentPrevious(segment);
                 }
                 currentSegment.setType(previous.type);
+                currentSegment.setTrafficType(previous.trafficType);
+                currentSegment.setPriority(previous.priority);
                 if (previous.endHeading != -Float.MIN_VALUE)
                     currentSegment.setStartHeading(previous.endHeading, true);
                 return;
@@ -332,24 +411,30 @@ class Builder extends PComponent {
     }
 
     public void mouseDragged() {
+        if (mouseButton != LEFT || sketch.running)
+            return;
         if (cursor.draggedAnchor != null) {
             cursor.draggedAnchor.setPos(cursor.pos);
         }
     }
 
     public void keyPressed() {
+        if (sketch.running)
+            return;
+
         if (keyString.equals("Escape")) {
             if (currentSegment != null)
                 deselectSegment();
             else if (currentAnchor != null)
                 deselectAnchor();
-        } else if (key == ' ') {
+        } else if (key == 'w') {
             if (currentSegment != null) {
                 if (currentSegment.type == SegmentType.STRAIGHT) {
                     currentSegment.setType(SegmentType.BEZIER);
                 } else {
                     currentSegment.setType(SegmentType.STRAIGHT);
                 }
+                currentSegment.updatePath(true);
             }
         }
     }

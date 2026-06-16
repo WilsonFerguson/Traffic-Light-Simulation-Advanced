@@ -5,19 +5,51 @@ class Settings extends PFunctions {
 
     public static boolean drawAnchors = true;
 
+    /**
+     * Statistically, how many seconds between each spawn of a road user
+     */
+    public static float trafficSpawnInterval = 0.2f;
+    public static int maxTraffic = 100;
+    public static float OVSpawnChance = 0.05f;
+
     public static float sizeAnchor = 1.5f * pixelsPerMeter;
     public static float segmentWidthCar = 3 * pixelsPerMeter;
     public static float segmentWidthBike1Way = 2 * pixelsPerMeter;
     public static float segmentWidthBike2Way = 4 * pixelsPerMeter;
     public static float segmentWidthPedestrian = 2 * pixelsPerMeter;
 
+    public static int segmentPriorityOV = 8;
+    public static int segmentPriorityCar = 5;
+    public static int segmentPriorityBike = 7;
+    public static int segmentPriorityPedestrian = 6;
+
+    public static float vehicleWidthOV = 2.5f * pixelsPerMeter;
     public static float vehicleWidthCar = 1.9f * pixelsPerMeter;
     public static float vehicleWidthBike = 0.55f * pixelsPerMeter;
     public static float vehicleWidthPedestrian = 0.45f * pixelsPerMeter;
 
+    public static float vehicleLengthOV = 7 * pixelsPerMeter;
     public static float vehicleLengthCar = 4.5f * pixelsPerMeter;
     public static float vehicleLengthBike = 1.7f * pixelsPerMeter;
     public static float vehicleLengthPedestrian = vehicleWidthPedestrian;
+
+    public static float vehicleAccelerationOV = 1.75f * pixelsPerMeter;
+    public static float vehicleAccelerationCar = 1.75f * pixelsPerMeter;
+    public static float vehicleAccelerationBike = 0.23f * pixelsPerMeter;
+    public static float vehicleAccelerationPedestrian = 1f * pixelsPerMeter;
+
+    public static float vehicleMaxSpeedOV = 8.3f * pixelsPerMeter;
+    public static float vehicleMaxSpeedCar = 8.3f * pixelsPerMeter;
+    public static float vehicleMaxSpeedBike = 3.6f * pixelsPerMeter;
+    public static float vehicleMaxSpeedPedestrian = 1 * pixelsPerMeter;
+
+    public static float reactionTime = 1;
+    public static float turningRate = 0.08f;
+    public static float distanceToNodeThreshold = 2f * pixelsPerMeter;
+
+    public static float variationAcceleration = 0.22f;
+    public static float variationMaxSpeed = 0.22f;
+    public static float variationReactionTime = 0.2f;
 
     public static color lightGreen = new color(36, 156, 42);
     public static color lightYellow = new color(207, 176, 54);

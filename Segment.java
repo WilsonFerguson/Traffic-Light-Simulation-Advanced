@@ -13,6 +13,12 @@ class Segment extends PComponent {
     Text textSegmentWidth;
     Text textSegmentWidthUnits;
     InputField inputFieldSegmentWidth;
+    Text textSegmentPriority;
+    InputField inputFieldSegmentPriority;
+    Button buttonSegmentPriorityDecrease;
+    Button buttonSegmentPriorityIncrease;
+    Button buttonTypeStraight;
+    Button buttonTypeBezier;
 
     Anchor startAnchor;
     Anchor endAnchor;
@@ -49,14 +55,17 @@ class Segment extends PComponent {
 
     TrafficType trafficType;
     float segmentWidth;
-    float nodeSpacingStraight;
-    float nodeSpacingBezier;
     color segmentColor;
+    int priority = 5;
 
     boolean openingSegment;
     boolean closingSegment;
 
     public Segment(Builder builder, PVector pos) {
+        this(builder, pos, TrafficType.CAR);
+    }
+
+    private Segment(Builder builder, PVector pos, TrafficType trafficType) {
         this.builder = builder;
         type = SegmentType.STRAIGHT;
 
@@ -66,7 +75,7 @@ class Segment extends PComponent {
         startHeading = -Float.MIN_VALUE;
         endHeading = -Float.MIN_VALUE;
 
-        setTrafficType(TrafficType.CAR);
+        setTrafficType(trafficType);
 
         openingSegment = false;
         closingSegment = false;
@@ -84,6 +93,8 @@ class Segment extends PComponent {
         createButtonsTrafficType(w, margin);
         createButtonPathColor(w, margin);
         createInputFieldSegmentWidth(w, margin);
+        createButtonsSegmentPriority(w, margin);
+        createButtonsSegmentType(w, margin);
 
         // Set size
         float bottomY = segmentEditorPanel.getElements().getLast().pos.y;
@@ -99,6 +110,13 @@ class Segment extends PComponent {
         segmentEditorPanel.setActive(false);
     }
 
+    private float calculateButtonX(float i, float w, float margin) {
+        int numButtons = TrafficType.values().length;
+
+        return map(i, 0, numButtons - 1, -segmentEditorPanel.size.x / 2 + w / 2 + margin,
+                segmentEditorPanel.size.x / 2 - w / 2 - margin);
+    }
+
     private void createButtonsTrafficType(float w, float margin) {
         int numButtons = TrafficType.values().length;
         buttonsTrafficTypes = new ArrayList<Button>(numButtons);
@@ -109,8 +127,7 @@ class Segment extends PComponent {
 
         for (int i = 0; i < numButtons; i++) {
             TrafficType trafficTypeButton = TrafficType.values()[i];
-            float x = map(i, 0, numButtons - 1, -segmentEditorPanel.size.x / 2 + w / 2 + margin,
-                    segmentEditorPanel.size.x / 2 - w / 2 - margin);
+            float x = calculateButtonX(i, w, margin);
 
             Button button = new Button(x, 0, w, w, texts[i]);
 
@@ -196,9 +213,7 @@ class Segment extends PComponent {
         textSegmentWidth = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Path width")
                 .setTextAlignment(TextAlignment.LEFT);
 
-        float x = map(buttonsTrafficTypes.size() - 2, 0, buttonsTrafficTypes.size() - 1,
-                -segmentEditorPanel.size.x / 2 + w / 2 + margin,
-                segmentEditorPanel.size.x / 2 - w / 2 - margin);
+        float x = calculateButtonX(buttonsTrafficTypes.size() - 2, w, margin);
         inputFieldSegmentWidth = new InputField(x, 0, w, w)
                 .setDefaultText("").setAutoResize(false).setTextAlignment(TextAlignment.CENTER).setNumbersOnly(true);
 
@@ -220,11 +235,100 @@ class Segment extends PComponent {
             }
         });
 
-        textSegmentWidthUnits = new Text(segmentEditorPanel.size.x / 2 - margin - w / 2, 0, "m");
+        textSegmentWidthUnits = new Text(segmentEditorPanel.size.x / 2 - margin - w, 0, "m");
 
         segmentEditorPanel.addElementFromTop(textSegmentWidth, false);
         segmentEditorPanel.addElementFromTop(inputFieldSegmentWidth, false);
         segmentEditorPanel.addElementFromTop(textSegmentWidthUnits, false);
+    }
+
+    public void createButtonsSegmentPriority(float w, float margin) {
+        segmentEditorPanel.incrementElementHeight(margin + w);
+
+        textSegmentPriority = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Priority")
+                .setTextAlignment(TextAlignment.LEFT);
+
+        buttonSegmentPriorityDecrease = new Button(calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w,
+                w, "-");
+        buttonSegmentPriorityDecrease.onClick(new Runnable() {
+            @Override
+            public void run() {
+                priority--;
+                if (priority < 0)
+                    priority = 0;
+                inputFieldSegmentPriority.setText(String.valueOf(priority));
+            }
+        });
+
+        inputFieldSegmentPriority = new InputField(calculateButtonX(TrafficType.values().length - 2, w, margin), 0, w,
+                w).setTextAlignment(TextAlignment.CENTER).setNumbersOnly(true).setAutoResize(false);
+        inputFieldSegmentPriority.setText(String.valueOf(priority));
+        inputFieldSegmentPriority.onInput(new Runnable() {
+            @Override
+            public void run() {
+                if (inputFieldSegmentPriority.getText().length() == 0)
+                    return;
+                priority = round(parseFloat(inputFieldSegmentPriority.getText()));
+                if (priority >= 99)
+                    priority = 99;
+            }
+        });
+        inputFieldSegmentPriority.onEnter(new Runnable() {
+            @Override
+            public void run() {
+                if (inputFieldSegmentPriority.getText().length() == 0)
+                    return;
+                priority = round(parseFloat(inputFieldSegmentPriority.getText()));
+                if (priority >= 99) {
+                    priority = 99;
+                    inputFieldSegmentPriority.setText(String.valueOf(priority));
+                }
+            }
+        });
+
+        buttonSegmentPriorityIncrease = new Button(calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w,
+                w, "+");
+        buttonSegmentPriorityIncrease.onClick(new Runnable() {
+            @Override
+            public void run() {
+                priority++;
+                if (priority >= 99)
+                    priority = 99;
+                inputFieldSegmentPriority.setText(String.valueOf(priority));
+            }
+        });
+
+        segmentEditorPanel.addElementFromTop(textSegmentPriority, false);
+        segmentEditorPanel.addElementFromTop(buttonSegmentPriorityDecrease, false);
+        segmentEditorPanel.addElementFromTop(inputFieldSegmentPriority, false);
+        segmentEditorPanel.addElementFromTop(buttonSegmentPriorityIncrease, false);
+    }
+
+    public void createButtonsSegmentType(float w, float margin) {
+        segmentEditorPanel.incrementElementHeight(margin + w);
+
+        int numButtons = TrafficType.values().length;
+        buttonTypeStraight = new Button(calculateButtonX(numButtons * 1.0f / 3.0f - 1, w, margin), 0,
+                3 * w + 4 * margin, w, "Straight");
+        buttonTypeStraight.onClick(new Runnable() {
+            @Override
+            public void run() {
+                setType(SegmentType.STRAIGHT);
+                updatePath(true);
+            }
+        });
+        buttonTypeBezier = new Button(calculateButtonX(numButtons * 2.0f / 3.0f, w, margin), 0,
+                3 * w + 4 * margin, w, "Bezier");
+        buttonTypeBezier.onClick(new Runnable() {
+            @Override
+            public void run() {
+                setType(SegmentType.BEZIER);
+                updatePath(true);
+            }
+        });
+
+        segmentEditorPanel.addElementFromTop(buttonTypeStraight, false);
+        segmentEditorPanel.addElementFromTop(buttonTypeBezier, false);
     }
 
     public void updatePath(boolean recursive) {
@@ -252,7 +356,7 @@ class Segment extends PComponent {
         switch (type) {
             case STRAIGHT:
                 float dist = PVector.sub(end, start).mag();
-                int numNodes = ceil(dist / nodeSpacingStraight);
+                int numNodes = ceil(dist / Settings.distanceToNodeThreshold);
 
                 if (numNodes == 0) {
                     path.add(start);
@@ -277,7 +381,7 @@ class Segment extends PComponent {
                     endControlPointMag = width / 10;
 
                 dist = PVector.sub(end, start).mag();
-                numNodes = ceil(dist / nodeSpacingBezier);
+                numNodes = ceil(dist / Settings.distanceToNodeThreshold);
 
                 if (numNodes == 0) {
                     path.add(start);
@@ -382,34 +486,43 @@ class Segment extends PComponent {
 
         noStroke();
         // drawPathPoints();
-
         drawControlPoints();
 
+        updateEditorPanel();
+
+    }
+
+    private void updateEditorPanel() {
         segmentEditorPanel.setActive(true);
         for (UIElement element : segmentEditorPanel.getElements()) {
             if (element == colorPickerPathColor)
                 continue;
             element.setActive(true);
         }
-        float margin = segmentEditorPanel.size.x / 10;
-        float x, y;
-        if (path.size() == 0) {
-            x = start.x + segmentEditorPanel.size.x / 2 + margin;
-            y = start.y;
-        } else {
-            x = path.get(floor(path.size() / 2)).x + segmentEditorPanel.size.x / 2 + margin;
-            y = path.get(floor(path.size() / 2)).y;
-        }
-        if (x + segmentEditorPanel.size.x / 2 > width) {
-            if (path.size() == 0) {
-                x = start.x - segmentEditorPanel.size.x / 2 - margin;
-            } else {
-                x = path.get(floor(path.size() / 2)).x - segmentEditorPanel.size.x / 2 - margin;
-            }
-        }
 
-        PVector targetPos = PVector.lerp(segmentEditorPanel.pos, new PVector(x, y), 0.1);
-        segmentEditorPanel.setPos(targetPos);
+        float margin = segmentEditorPanel.size.x / 10;
+        // float x, y;
+        // if (path.size() == 0) {
+        // x = start.x + segmentEditorPanel.size.x / 2 + margin;
+        // y = start.y;
+        // } else {
+        // x = path.get(floor(path.size() / 2)).x + segmentEditorPanel.size.x / 2 +
+        // margin;
+        // y = path.get(floor(path.size() / 2)).y;
+        // }
+        // if (x + segmentEditorPanel.size.x / 2 > width) {
+        // if (path.size() == 0) {
+        // x = start.x - segmentEditorPanel.size.x / 2 - margin;
+        // } else {
+        // x = path.get(floor(path.size() / 2)).x - segmentEditorPanel.size.x / 2 -
+        // margin;
+        // }
+        // }
+        //
+        // PVector targetPos = PVector.lerp(segmentEditorPanel.pos, new PVector(x, y),
+        // 0.1);
+        // segmentEditorPanel.setPos(targetPos);
+        segmentEditorPanel.setPos(margin + segmentEditorPanel.size.x / 2, margin + segmentEditorPanel.size.y / 2);
 
         segmentEditorPanel.draw();
     }
@@ -698,32 +811,31 @@ class Segment extends PComponent {
         switch (trafficType) {
             case OV:
                 segmentWidth = Settings.segmentWidthCar;
-                nodeSpacingStraight = Settings.vehicleLengthCar * 1.1f;
                 segmentColor = Settings.segmentColorOV;
+                setPriority(Settings.segmentPriorityOV);
                 break;
             case CAR:
                 segmentWidth = Settings.segmentWidthCar;
-                nodeSpacingStraight = Settings.vehicleLengthCar * 1.1f;
                 segmentColor = Settings.segmentColorCar;
+                setPriority(Settings.segmentPriorityCar);
                 break;
             case BIKE_1WAY:
                 segmentWidth = Settings.segmentWidthBike1Way;
-                nodeSpacingStraight = Settings.vehicleLengthBike * 1.1f;
                 segmentColor = Settings.segmentColorBike;
+                setPriority(Settings.segmentPriorityBike);
                 break;
             case BIKE_2WAY:
                 segmentWidth = Settings.segmentWidthBike2Way;
-                nodeSpacingStraight = Settings.vehicleLengthBike * 1.03f;
                 segmentColor = Settings.segmentColorBike;
+                setPriority(Settings.segmentPriorityBike);
                 break;
             case PEDESTRIAN:
                 segmentWidth = Settings.segmentWidthPedestrian;
-                nodeSpacingStraight = Settings.vehicleLengthPedestrian * 1.03f;
                 segmentColor = Settings.segmentColorPedestrian;
+                setPriority(Settings.segmentPriorityPedestrian);
                 break;
             case MEDIAN:
                 segmentWidth = Settings.segmentWidthPedestrian;
-                nodeSpacingStraight = Settings.vehicleLengthPedestrian * 1.03f;
                 segmentColor = Settings.segmentColorPedestrian;
                 break;
         }
@@ -742,8 +854,13 @@ class Segment extends PComponent {
                 inputFieldSegmentWidth.setText(String.valueOf(segmentWidth / Settings.pixelsPerMeter));
             }
         }
+    }
 
-        nodeSpacingBezier = nodeSpacingStraight / 2;
+    public void setPriority(int priority) {
+        this.priority = priority;
+        if (inputFieldSegmentPriority != null) {
+            inputFieldSegmentPriority.setText(String.valueOf(priority));
+        }
     }
 
     public void setOpeningSegment(boolean openingSegment) {
@@ -766,15 +883,92 @@ class Segment extends PComponent {
         return start;
     }
 
-    public PVector getFinalNode() {
+    public PVector getEndNode() {
         return end;
     }
 
+    public PVector getNode(int index) {
+        return path.get(index);
+    }
+
     public void mousePressed() {
+        if (mouseButton != LEFT)
+            return;
         if (colorPickerPathColor != null && colorPickerPathColor.isActive()) {
             if (!colorPickerPathColor.hover())
                 colorPickerPathColor.setActive(false);
         }
     }
 
+    public Segment copy() {
+        Segment copy = new Segment(builder, start, trafficType);
+
+        copy.builder = builder;
+
+        copy.startAnchor = startAnchor;
+        copy.endAnchor = endAnchor;
+        copy.type = type;
+
+        for (Segment segment : segmentsPrevious) {
+            copy.segmentsPrevious.add(segment);
+        }
+        for (Segment segment : segmentsNext) {
+            copy.segmentsNext.add(segment);
+        }
+        for (Segment segment : snappedToSegments) {
+            copy.snappedToSegments.add(segment);
+            segment.controlledSegments.add(copy);
+            if (segment.controlledLeftStart.contains(this))
+                segment.controlledLeftStart.add(copy);
+            if (segment.controlledRightStart.contains(this))
+                segment.controlledRightStart.add(copy);
+            if (segment.controlledLeftEnd.contains(this))
+                segment.controlledLeftEnd.add(copy);
+            if (segment.controlledRightEnd.contains(this))
+                segment.controlledRightEnd.add(copy);
+            if (segment.controlledFullLeft.contains(this))
+                segment.controlledFullLeft.add(copy);
+            if (segment.controlledFullRight.contains(this))
+                segment.controlledFullRight.add(copy);
+        }
+
+        copy.start = start.copy();
+        copy.end = end.copy();
+        copy.startHeading = startHeading;
+        copy.endHeading = endHeading;
+        copy.startControlPointMag = startControlPointMag;
+        copy.endControlPointMag = endControlPointMag;
+
+        copy.path = new ArrayList<PVector>();
+        for (PVector point : path) {
+            copy.path.add(point.copy());
+        }
+
+        copy.trafficType = trafficType;
+        copy.segmentWidth = segmentWidth;
+        copy.segmentColor = segmentColor.copy();
+        copy.priority = priority;
+
+        copy.openingSegment = openingSegment;
+        copy.closingSegment = closingSegment;
+
+        copy.colorPickerPathColor.setColor(copy.segmentColor);
+        copy.buttonPathColor.setDefaultColor(color(copy.segmentColor, 150));
+        copy.buttonPathColor.setHoverColor(
+                color(copy.segmentColor.r + 15, copy.segmentColor.g + 15, copy.segmentColor.b + 15, 150));
+        copy.buttonPathColor.setActiveColor(
+                color(copy.segmentColor.r - 10, copy.segmentColor.g - 10, copy.segmentColor.b - 10, 150));
+
+        float value = copy.segmentWidth / Settings.pixelsPerMeter;
+        try {
+            String text = str((int) value);
+            copy.inputFieldSegmentWidth.setText(text);
+        } catch (Exception e) {
+            copy.inputFieldSegmentWidth.setText(String.valueOf(copy.segmentWidth / Settings.pixelsPerMeter));
+        }
+
+        copy.inputFieldSegmentPriority.setText(String.valueOf(copy.priority));
+
+        return copy;
+    }
 }

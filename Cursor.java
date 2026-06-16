@@ -57,7 +57,7 @@ class Cursor extends PComponent {
             if (segment == currentSegment)
                 continue;
 
-            PVector node = (currentSegment == null) ? segment.getStartNode() : segment.getFinalNode();
+            PVector node = (currentSegment == null) ? segment.getStartNode() : segment.getEndNode();
             float heading = (currentSegment == null) ? segment.startHeading : segment.endHeading;
 
             float myWidth = (currentSegment != null) ? currentSegment.segmentWidth : segment.segmentWidth;
@@ -172,12 +172,12 @@ class Cursor extends PComponent {
             for (Segment next : currentSegment.segmentsNext) {
                 if (next.type != SegmentType.STRAIGHT)
                     continue;
-                float cursorHeading = PVector.sub(pos, currentSegment.getFinalNode()).heading();
+                float cursorHeading = PVector.sub(pos, currentSegment.getEndNode()).heading();
                 float headingDiff = abs(abs(cursorHeading) + abs(next.endHeading));
                 if (headingDiff % PI < radianMargin) {
-                    float dist = PVector.dist(currentSegment.getFinalNode(), pos);
+                    float dist = PVector.dist(currentSegment.getEndNode(), pos);
                     pos = PVector.fromAngle(next.endHeading).setMag(-dist)
-                            .add(currentSegment.getFinalNode());
+                            .add(currentSegment.getEndNode());
                     snapping90 = true;
                     return true;
                 }
@@ -188,6 +188,8 @@ class Cursor extends PComponent {
     }
 
     public void mousePressed() {
+        if (mouseButton != LEFT)
+            return;
         if (builder.currentSegment != null && builder.segmentPlaced) {
             if (pos.dist(builder.currentSegment.getStartControlPoint()) < Settings.sizeAnchor / 2) {
                 selectedStartControlPoint = builder.currentSegment;
