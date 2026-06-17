@@ -243,6 +243,45 @@ class Builder extends PComponent {
         }
     }
 
+    private void createBrandNewSegment(Anchor hoveredAnchor, Segment hoveredSegment) {
+        if (hoveredAnchor == null && hoveredSegment == null) {
+            newAnchor(cursor.pos);
+            newSegment(cursor.pos);
+            if (cursor.snappingWall) {
+                currentSegment.setOpeningSegment(true);
+                currentAnchor.setOpeningAnchor(true);
+            }
+            if (cursor.snappingToLeftOfSegment) {
+                cursor.snappingToSegment.controlLeftStart(currentSegment);
+            } else if (cursor.snappingToRightOfSegment) {
+                cursor.snappingToSegment.controlRightStart(currentSegment);
+            }
+        }
+        if (hoveredAnchor != null) {
+            if (hoveredAnchor.endSegments.size() == 0) {
+                selectAnchor(hoveredAnchor);
+                newSegment(cursor.pos);
+                return;
+            }
+
+            selectAnchor(hoveredAnchor);
+            Segment previousFirst = hoveredAnchor.endSegments.iterator().next();
+            Set<Segment> previousSegments = hoveredAnchor.endSegments;
+            newSegment(cursor.pos, previousFirst.getStraightHeading());
+
+            for (Segment previous : previousSegments) {
+                currentSegment.addSegmentPrevious(previous);
+            }
+            currentSegment.setType(previousFirst.type);
+            currentSegment.setTrafficType(previousFirst.trafficType);
+            currentSegment.setPriority(previousFirst.priority);
+            if (previousFirst.endHeading != -Float.MIN_VALUE)
+                currentSegment.setStartHeading(previousFirst.endHeading, true);
+
+            return;
+        }
+    }
+
     private void finishOffCurrentSegment() {
         if (segmentPlaced)
             return;
@@ -267,6 +306,137 @@ class Builder extends PComponent {
             cursor.snappingToSegment.controlRightEnd(currentSegment);
     }
 
+    /**
+     * Splits a segment into two segments at the given anchor. The original segment
+     * becomes the first half and the second half is returned (and added to the list
+     * of segments).
+     */
+    private Segment splitSegment(Segment original, Anchor anchor) {
+        Segment next = original.copy();
+
+        for (Segment segment : original.segmentsNext)
+            segment.segmentsPrevious.remove(original);
+        original.segmentsNext.clear();
+
+        for (Segment segment : next.segmentsPrevious)
+            segment.segmentsNext.remove(next);
+        next.segmentsPrevious.clear();
+        for (Segment segment : next.segmentsNext) {
+            segment.segmentsPrevious.add(next);
+        }
+
+        original.addSegmentNext(next);
+        original.setClosingSegment(false);
+        next.setOpeningSegment(false);
+
+        original.endAnchor.endSegments.remove(original);
+        original.endAnchor.endSegments.add(next);
+
+        original.endAnchor = anchor;
+        anchor.endSegments.add(original);
+
+        next.startAnchor = anchor;
+        anchor.beginSegments.add(next);
+
+        original.setEndNode(anchor.pos);
+        next.setStartNode(anchor.pos);
+
+        original.updatePath(true);
+        next.updatePath(true);
+
+        segments.add(next);
+        return next;
+    }
+
+    private void makeTJunction(Segment hovered, Segment comingIn) {
+        Segment next = splitSegment(hovered, currentAnchor);
+        comingIn.addSegmentNext(next);
+    }
+
+    private void make4WayJunction(Segment crossed, Segment comingIn, PVector intersection) {
+        Anchor anchor = new Anchor(this, intersection);
+        anchors.add(anchor);
+
+        Segment crossedNext = splitSegment(crossed, anchor);
+        Segment comingInNext = splitSegment(comingIn, anchor);
+
+        comingIn.addSegmentNext(crossedNext);
+        crossed.addSegmentNext(comingInNext);
+    }
+
+    /**
+     * Completes the current segment where the ending is not on a pre-existing
+     * anchor
+     */
+    private void completeCurrentSegmentFree() {
+        Segment hovered = getHoveredSegment(currentSegment);
+        Segment comingIn = currentSegment;
+
+        finishOffCurrentSegment();
+        Segment previous = currentSegment;
+        segmentPlaced = false;
+
+        newSegment(cursor.pos, currentSegment.getStraightHeading());
+
+        if (cursor.snappingToLeftOfSegment)
+            cursor.snappingToSegment.controlLeftStart(currentSegment);
+        else if (cursor.snappingToRightOfSegment)
+            cursor.snappingToSegment.controlRightStart(currentSegment);
+
+        currentSegment.addSegmentPrevious(previous);
+        currentSegment.setType(previous.type);
+        currentSegment.setTrafficType(previous.trafficType);
+        currentSegment.setPriority(previous.priority);
+        if (previous.endHeading != -Float.MIN_VALUE)
+            currentSegment.setStartHeading(previous.endHeading, true);
+
+        // If we are hovering a pre-existing segment, then we need to split that one
+        if (hovered != null) {
+            makeTJunction(hovered, comingIn);
+        } else {
+            // If we crossed a pre-existing segment, then we need to make a 4-way junction
+            // Segment crossed = comingIn.getCrossedSegment(segments);
+            Object[] data = comingIn.getCrossedSegment(segments);
+            if (data != null) {
+                make4WayJunction((Segment) data[0], comingIn, (PVector) data[1]);
+            }
+        }
+    }
+
+    private void completeCurrentSegmentWithAnchor(Anchor hoveredAnchor) {
+        selectAnchor(hoveredAnchor);
+        currentSegment.setEndAnchor(currentAnchor);
+        float heading = currentSegment.getStraightHeading();
+        if (currentSegment.type == SegmentType.STRAIGHT) {
+            currentSegment.setHeadings(heading, heading);
+            currentSegment.setPreviousEndHeading(heading);
+            currentSegment.updatePath(true);
+        }
+        boolean updatedHeading = false;
+        for (Segment segment : currentAnchor.beginSegments) {
+            currentSegment.addSegmentNext(segment);
+            if (!updatedHeading && currentSegment.type == SegmentType.BEZIER) {
+                currentSegment.setEndControlPoint(segment.startHeading, segment.startControlPointMag);
+                currentSegment.updatePath(true);
+                updatedHeading = true;
+            }
+        }
+
+        Segment previous = currentSegment;
+        segmentPlaced = false;
+
+        newSegment(cursor.pos, currentSegment.getStraightHeading());
+        for (Segment segment : currentAnchor.endSegments) {
+            currentSegment.addSegmentPrevious(segment);
+        }
+        currentSegment.setType(previous.type);
+        currentSegment.setTrafficType(previous.trafficType);
+        currentSegment.setPriority(previous.priority);
+        if (previous.endHeading != -Float.MIN_VALUE)
+            currentSegment.setStartHeading(previous.endHeading, true);
+        return;
+    }
+
     public void mouseClicked() {
         if (mouseButton != LEFT || sketch.running)
             return;
@@ -275,130 +445,16 @@ class Builder extends PComponent {
         Anchor hoveredAnchor = getHoveredAnchor();
         Segment hoveredSegment = getHoveredSegment();
         if (currentAnchor == null && currentSegment == null && hoveredSegment == null) {
-            if (hoveredAnchor == null && hoveredSegment == null) {
-                newAnchor(cursor.pos);
-                newSegment(cursor.pos);
-                if (cursor.snappingWall) {
-                    currentSegment.setOpeningSegment(true);
-                    currentAnchor.setOpeningAnchor(true);
-                }
-                if (cursor.snappingToLeftOfSegment) {
-                    cursor.snappingToSegment.controlLeftStart(currentSegment);
-                } else if (cursor.snappingToRightOfSegment) {
-                    cursor.snappingToSegment.controlRightStart(currentSegment);
-                }
-            }
-            if (hoveredAnchor != null) {
-                if (hoveredAnchor.endSegments.size() == 0) {
-                    selectAnchor(hoveredAnchor);
-                    newSegment(cursor.pos);
-                    return;
-                }
-
-                selectAnchor(hoveredAnchor);
-                Segment previousFirst = hoveredAnchor.endSegments.iterator().next();
-                Set<Segment> previousSegments = hoveredAnchor.endSegments;
-                newSegment(cursor.pos, previousFirst.getStraightHeading());
-
-                for (Segment previous : previousSegments) {
-                    currentSegment.addSegmentPrevious(previous);
-                }
-                currentSegment.setType(previousFirst.type);
-                currentSegment.setTrafficType(previousFirst.trafficType);
-                currentSegment.setPriority(previousFirst.priority);
-                if (previousFirst.endHeading != -Float.MIN_VALUE)
-                    currentSegment.setStartHeading(previousFirst.endHeading, true);
-
-                return;
-            }
-
+            createBrandNewSegment(hoveredAnchor, hoveredSegment);
             return;
         }
 
         // Make new segment that continues path
-        if (currentSegment != null && !segmentPlaced) {
-            if (!hoveringSegmentInfo() && hoveredAnchor == null) {
-                Segment hovered = getHoveredSegment(currentSegment);
-                Segment comingIn = currentSegment;
-
-                finishOffCurrentSegment();
-                Segment previous = currentSegment;
-                segmentPlaced = false;
-
-                newSegment(cursor.pos, currentSegment.getStraightHeading());
-
-                if (cursor.snappingToLeftOfSegment)
-                    cursor.snappingToSegment.controlLeftStart(currentSegment);
-                else if (cursor.snappingToRightOfSegment)
-                    cursor.snappingToSegment.controlRightStart(currentSegment);
-
-                currentSegment.addSegmentPrevious(previous);
-                currentSegment.setType(previous.type);
-                currentSegment.setTrafficType(previous.trafficType);
-                currentSegment.setPriority(previous.priority);
-                if (previous.endHeading != -Float.MIN_VALUE)
-                    currentSegment.setStartHeading(previous.endHeading, true);
-
-                // If we are hovering a pre-existing segment, then we need to split that one
-                if (hovered != null) {
-                    Segment copy = hovered.copy();
-                    // Hovered segment will be the first segment
-                    hovered.addSegmentNext(copy);
-                    hovered.setClosingSegment(false);
-                    copy.setOpeningSegment(false);
-
-                    hovered.endAnchor.endSegments.remove(hovered);
-                    hovered.endAnchor.endSegments.add(copy);
-                    hovered.endAnchor = currentAnchor;
-                    currentAnchor.endSegments.add(hovered);
-                    copy.startAnchor = currentAnchor;
-                    currentAnchor.beginSegments.add(copy);
-
-                    hovered.setEndNode(currentSegment.getEndNode());
-                    copy.setStartNode(currentSegment.getStartNode());
-
-                    comingIn.addSegmentNext(copy);
-
-                    hovered.updatePath(false);
-                    copy.updatePath(false);
-
-                    segments.add(copy);
-                }
-
-                return;
-            } else if (!hoveringSegmentInfo() && hoveredAnchor != null) {
-                selectAnchor(hoveredAnchor);
-                currentSegment.setEndAnchor(currentAnchor);
-                float heading = currentSegment.getStraightHeading();
-                if (currentSegment.type == SegmentType.STRAIGHT) {
-                    currentSegment.setHeadings(heading, heading);
-                    currentSegment.setPreviousEndHeading(heading);
-                    currentSegment.updatePath(true);
-                }
-                boolean updatedHeading = false;
-                for (Segment segment : currentAnchor.beginSegments) {
-                    currentSegment.addSegmentNext(segment);
-                    if (!updatedHeading && currentSegment.type == SegmentType.BEZIER) {
-                        currentSegment.setEndControlPoint(segment.startHeading, segment.startControlPointMag);
-                        currentSegment.updatePath(true);
-                        updatedHeading = true;
-                    }
-                }
-
-                Segment previous = currentSegment;
-                segmentPlaced = false;
-
-                newSegment(cursor.pos, currentSegment.getStraightHeading());
-                for (Segment segment : currentAnchor.endSegments) {
-                    currentSegment.addSegmentPrevious(segment);
-                }
-                currentSegment.setType(previous.type);
-                currentSegment.setTrafficType(previous.trafficType);
-                currentSegment.setPriority(previous.priority);
-                if (previous.endHeading != -Float.MIN_VALUE)
-                    currentSegment.setStartHeading(previous.endHeading, true);
-                return;
-            }
+        if (currentSegment != null && !segmentPlaced && !hoveringSegmentInfo()) {
+            if (hoveredAnchor == null)
+                completeCurrentSegmentFree();
+            else
+                completeCurrentSegmentWithAnchor(hoveredAnchor);
         }
 
         if (hoveredSegment != null && (currentSegment == null || segmentPlaced)) {

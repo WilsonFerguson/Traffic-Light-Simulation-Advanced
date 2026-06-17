@@ -891,6 +891,54 @@ class Segment extends PComponent {
         return path.get(index);
     }
 
+    public Object[] getCrossedSegment(ArrayList<Segment> segments) {
+        for (Segment segment : segments) {
+            if (segment == this || segment.path == null || segment.path.size() == 0)
+                continue;
+
+            // NOTE: we cut off the first and last nodes here which is probably fine because
+            // they should be anchors anyway or something? Anyhow it's needed to find the
+            // intersection point
+            for (int i = 1; i < path.size() - 2; i++) {
+                PVector node = path.get(i);
+                for (int j = 1; j < segment.path.size() - 2; j++) {
+                    PVector otherNode = segment.path.get(j);
+                    if (node.dist(otherNode) < Settings.distanceToNodeThreshold) {
+                        PVector intersection = findIntersection(path.get(i - 1), path.get(i + 1),
+                                segment.path.get(j - 1), segment.path.get(j + 1));
+                        return new Object[] { segment, intersection };
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private PVector findIntersection(PVector p1, PVector p2, PVector p3, PVector p4) {
+        float x1 = p1.x;
+        float y1 = p1.y;
+        float x2 = p2.x;
+        float y2 = p2.y;
+
+        float x3 = p3.x;
+        float y3 = p3.y;
+        float x4 = p4.x;
+        float y4 = p4.y;
+
+        float denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+
+        if (Math.abs(denom) < 1e-6f) {
+            return null; // Parallel or coincident lines
+        }
+
+        float px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
+
+        float py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
+
+        return new PVector(px, py);
+    }
+
     public void mousePressed() {
         if (mouseButton != LEFT)
             return;
@@ -931,6 +979,14 @@ class Segment extends PComponent {
             if (segment.controlledFullRight.contains(this))
                 segment.controlledFullRight.add(copy);
         }
+
+        copy.controlledSegments = new HashSet<>(controlledSegments);
+        copy.controlledLeftStart = new HashSet<>(controlledLeftStart);
+        copy.controlledRightStart = new HashSet<>(controlledRightStart);
+        copy.controlledLeftEnd = new HashSet<>(controlledLeftEnd);
+        copy.controlledRightEnd = new HashSet<>(controlledRightEnd);
+        copy.controlledFullLeft = new HashSet<>(controlledFullLeft);
+        copy.controlledFullRight = new HashSet<>(controlledFullRight);
 
         copy.start = start.copy();
         copy.end = end.copy();

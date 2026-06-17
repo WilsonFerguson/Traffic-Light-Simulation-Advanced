@@ -39,6 +39,13 @@ public class TrafficManager extends PComponent {
                 addOpeningSegment(segment);
             }
         }
+
+        for (Segment segment : segments) {
+            println("-----");
+            println(segment);
+            for (Segment seg : segment.segmentsNext)
+                println(seg);
+        }
     }
 
     public void addOpeningSegment(Segment segment) {
