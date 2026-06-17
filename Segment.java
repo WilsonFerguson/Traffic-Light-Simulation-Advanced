@@ -537,25 +537,7 @@ class Segment extends PComponent {
     }
 
     private void parallelSegment(Segment segment, int direction) {
-        float separation = segment.path.get(0).dist(path.get(0));
-        // segment.path = new ArrayList<PVector>(path.size());
-        //
-        // for (int i = 0; i < path.size(); i++) {
-        // PVector tangent;
-        //
-        // if (i == 0) {
-        // tangent = PVector.sub(path.get(1), path.get(0));
-        // } else if (i == path.size() - 1) {
-        // tangent = PVector.sub(path.get(i), path.get(i - 1));
-        // } else {
-        // tangent = PVector.sub(path.get(i + 1), path.get(i - 1));
-        // }
-        // tangent.normalize();
-        //
-        // PVector normal = tangent.copy().rotate(direction * PI /
-        // 2).setMag(separation);
-        // segment.path.add(PVector.add(path.get(i), normal));
-        // }
+        float separation = segmentWidth / 2 + segment.segmentWidth / 2;
 
         segment.path = parallelSegment(separation, direction);
     }
@@ -650,6 +632,7 @@ class Segment extends PComponent {
     }
 
     public void drawPath(ArrayList<PVector> pathToTrace) {
+        float effectiveWidth = segmentWidth * Settings.segmentWidthPadding;
         beginShape();
 
         // There
@@ -657,7 +640,7 @@ class Segment extends PComponent {
             PVector node = pathToTrace.get(i);
             PVector next = pathToTrace.get(i + 1);
 
-            PVector offset = PVector.sub(next, node).normalize().rotate(-PI / 2).mult(segmentWidth / 2);
+            PVector offset = PVector.sub(next, node).normalize().rotate(-PI / 2).mult(effectiveWidth / 2);
             vertex(PVector.add(node, offset));
 
             // Finish out this line by adding the same offset to the final node. This is
@@ -671,7 +654,7 @@ class Segment extends PComponent {
             PVector node = pathToTrace.get(i);
             PVector next = pathToTrace.get(i - 1);
 
-            PVector offset = PVector.sub(next, node).normalize().rotate(-PI / 2).mult(segmentWidth / 2);
+            PVector offset = PVector.sub(next, node).normalize().rotate(-PI / 2).mult(effectiveWidth / 2);
             vertex(PVector.add(node, offset));
 
             // Finish out this line by adding the same offset to the final node. This is
@@ -1038,6 +1021,8 @@ class Segment extends PComponent {
             if (segment == this || segment.path == null || segment.path.size() == 0)
                 continue;
             if (controlledSegments.contains(segment) || snappedToSegments.contains(segment))
+                continue;
+            if (endAnchor == segment.startAnchor || startAnchor == segment.endAnchor)
                 continue;
 
             // NOTE: we use found here to not have a segment be added multiple times. I

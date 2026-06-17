@@ -17,6 +17,11 @@ class Settings extends PFunctions {
     public static float segmentWidthBike1Way = 2 * pixelsPerMeter;
     public static float segmentWidthBike2Way = 4 * pixelsPerMeter;
     public static float segmentWidthPedestrian = 2 * pixelsPerMeter;
+    /**
+     * Multiplier when drawing the segments to remove the awkward green space that
+     * sometimes occurs between segments.
+     */
+    public static float segmentWidthPadding = 1.05f;
 
     public static int segmentPriorityOV = 8;
     public static int segmentPriorityCar = 5;
