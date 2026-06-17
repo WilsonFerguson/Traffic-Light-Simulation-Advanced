@@ -17,6 +17,10 @@ class Segment extends PComponent {
     InputField inputFieldSegmentPriority;
     Button buttonSegmentPriorityDecrease;
     Button buttonSegmentPriorityIncrease;
+    Button buttonParallel;
+    Button buttonParallelDecrease;
+    InputField inputFieldParallel;
+    Button buttonParallelIncrease;
     Button buttonTypeStraight;
     Button buttonTypeBezier;
 
@@ -94,6 +98,7 @@ class Segment extends PComponent {
         createButtonPathColor(w, margin);
         createInputFieldSegmentWidth(w, margin);
         createButtonsSegmentPriority(w, margin);
+        createButtonsParallel(w, margin);
         createButtonsSegmentType(w, margin);
 
         // Set size
@@ -266,22 +271,26 @@ class Segment extends PComponent {
         inputFieldSegmentPriority.onInput(new Runnable() {
             @Override
             public void run() {
-                if (inputFieldSegmentPriority.getText().length() == 0)
-                    return;
-                priority = round(parseFloat(inputFieldSegmentPriority.getText()));
-                if (priority >= 99)
-                    priority = 99;
+                try {
+                    priority = round(parseFloat(inputFieldSegmentPriority.getText()));
+                    if (priority >= 99)
+                        priority = 99;
+                    if (priority < 0)
+                        priority = 0;
+                } catch (Exception e) {
+                }
             }
         });
         inputFieldSegmentPriority.onEnter(new Runnable() {
             @Override
             public void run() {
-                if (inputFieldSegmentPriority.getText().length() == 0)
-                    return;
-                priority = round(parseFloat(inputFieldSegmentPriority.getText()));
-                if (priority >= 99) {
-                    priority = 99;
-                    inputFieldSegmentPriority.setText(String.valueOf(priority));
+                try {
+                    priority = round(parseFloat(inputFieldSegmentPriority.getText()));
+                    if (priority >= 99 || priority < 0) {
+                        priority = (priority < 0) ? 0 : 99;
+                        inputFieldSegmentPriority.setText(String.valueOf(priority));
+                    }
+                } catch (Exception e) {
                 }
             }
         });
@@ -304,6 +313,86 @@ class Segment extends PComponent {
         segmentEditorPanel.addElementFromTop(buttonSegmentPriorityIncrease, false);
     }
 
+    public void createButtonsParallel(float w, float margin) {
+        segmentEditorPanel.incrementElementHeight(margin + w);
+
+        buttonParallel = new Button(calculateButtonX(1, w, margin), 0, w * 3 + margin * 4, w, "Parallel");
+        buttonParallel.onClick(new Runnable() {
+            @Override
+            public void run() {
+                builder.parallelMode = !builder.parallelMode;
+                if (builder.parallelMode) {
+                    buttonParallel.setDefaultColor(Settings.buttonAccentDefault);
+                    buttonParallel.setHoverColor(Settings.buttonAccentHover);
+                    buttonParallel.setActiveColor(Settings.buttonAccentActive);
+                } else {
+                    buttonParallel.setDefaultColor(Settings.buttonDefault);
+                    buttonParallel.setHoverColor(Settings.buttonHover);
+                    buttonParallel.setActiveColor(Settings.buttonActive);
+                }
+            }
+        });
+
+        buttonParallelDecrease = new Button(calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w,
+                w, "-");
+        buttonParallelDecrease.onClick(new Runnable() {
+            @Override
+            public void run() {
+                builder.parallelNumSegments--;
+                if (builder.parallelNumSegments < -99)
+                    builder.parallelNumSegments = -99;
+                inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
+            }
+        });
+
+        inputFieldParallel = new InputField(calculateButtonX(TrafficType.values().length - 2, w, margin), 0, w,
+                w).setTextAlignment(TextAlignment.CENTER).setNumbersOnly(true).setAutoResize(false);
+        inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
+        inputFieldParallel.onInput(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    builder.parallelNumSegments = round(parseFloat(inputFieldParallel.getText()));
+                    if (builder.parallelNumSegments >= 99)
+                        builder.parallelNumSegments = 99;
+                    if (builder.parallelNumSegments < -99)
+                        builder.parallelNumSegments = -99;
+                } catch (Exception e) {
+                }
+            }
+        });
+        inputFieldParallel.onEnter(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    builder.parallelNumSegments = round(parseFloat(inputFieldParallel.getText()));
+                    if (builder.parallelNumSegments >= 99 || builder.parallelNumSegments < -99) {
+                        builder.parallelNumSegments = (builder.parallelNumSegments < -99) ? -99 : 99;
+                        inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
+                    }
+                } catch (Exception e) {
+                }
+            }
+        });
+
+        buttonParallelIncrease = new Button(calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w,
+                w, "+");
+        buttonParallelIncrease.onClick(new Runnable() {
+            @Override
+            public void run() {
+                builder.parallelNumSegments++;
+                if (builder.parallelNumSegments >= 99)
+                    builder.parallelNumSegments = 99;
+                inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
+            }
+        });
+
+        segmentEditorPanel.addElementFromTop(buttonParallel, false);
+        segmentEditorPanel.addElementFromTop(buttonParallelDecrease, false);
+        segmentEditorPanel.addElementFromTop(inputFieldParallel, false);
+        segmentEditorPanel.addElementFromTop(buttonParallelIncrease, false);
+    }
+
     public void createButtonsSegmentType(float w, float margin) {
         segmentEditorPanel.incrementElementHeight(margin + w);
 
@@ -314,7 +403,7 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 setType(SegmentType.STRAIGHT);
-                updatePath(true);
+                updatePath();
             }
         });
         buttonTypeBezier = new Button(calculateButtonX(numButtons * 2.0f / 3.0f, w, margin), 0,
@@ -323,7 +412,7 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 setType(SegmentType.BEZIER);
-                updatePath(true);
+                updatePath();
             }
         });
 
@@ -331,7 +420,15 @@ class Segment extends PComponent {
         segmentEditorPanel.addElementFromTop(buttonTypeBezier, false);
     }
 
-    public void updatePath(boolean recursive) {
+    public void updatePath() {
+        updatePath(new HashSet<Segment>(), true);
+    }
+
+    private void updatePath(HashSet<Segment> visited, boolean recursive) {
+        if (visited.contains(this))
+            return;
+        visited.add(this);
+
         if (snappedToSegments.size() > 0 && recursive) {
             for (Segment segment : snappedToSegments) {
                 segment.updateControlledPaths();
@@ -341,11 +438,11 @@ class Segment extends PComponent {
         }
 
         for (Segment segment : segmentsPrevious) {
-            segment.updatePath(false);
+            segment.updatePath(visited, false);
         }
         if (recursive) {
             for (Segment segment : segmentsNext) {
-                segment.updatePath(false);
+                segment.updatePath(visited, false);
             }
         }
         updateControlledPaths();
@@ -417,7 +514,7 @@ class Segment extends PComponent {
         for (Segment segment : controlledSegments) {
             if (controlledFullLeft.contains(segment) || controlledFullRight.contains(segment))
                 continue;
-            segment.updatePath(true);
+            segment.updatePath();
         }
 
         for (Segment segment : controlledFullLeft) {
@@ -441,7 +538,30 @@ class Segment extends PComponent {
 
     private void parallelSegment(Segment segment, int direction) {
         float separation = segment.path.get(0).dist(path.get(0));
-        segment.path = new ArrayList<PVector>(path.size());
+        // segment.path = new ArrayList<PVector>(path.size());
+        //
+        // for (int i = 0; i < path.size(); i++) {
+        // PVector tangent;
+        //
+        // if (i == 0) {
+        // tangent = PVector.sub(path.get(1), path.get(0));
+        // } else if (i == path.size() - 1) {
+        // tangent = PVector.sub(path.get(i), path.get(i - 1));
+        // } else {
+        // tangent = PVector.sub(path.get(i + 1), path.get(i - 1));
+        // }
+        // tangent.normalize();
+        //
+        // PVector normal = tangent.copy().rotate(direction * PI /
+        // 2).setMag(separation);
+        // segment.path.add(PVector.add(path.get(i), normal));
+        // }
+
+        segment.path = parallelSegment(separation, direction);
+    }
+
+    public ArrayList<PVector> parallelSegment(float separation, int direction) {
+        ArrayList<PVector> newPath = new ArrayList<PVector>(path.size());
 
         for (int i = 0; i < path.size(); i++) {
             PVector tangent;
@@ -456,8 +576,10 @@ class Segment extends PComponent {
             tangent.normalize();
 
             PVector normal = tangent.copy().rotate(direction * PI / 2).setMag(separation);
-            segment.path.add(PVector.add(path.get(i), normal));
+            newPath.add(PVector.add(path.get(i), normal));
         }
+
+        return newPath;
     }
 
     public void show() {
@@ -757,8 +879,10 @@ class Segment extends PComponent {
     public void controlLeftStart(Segment segment) {
         controlledLeftStart.add(segment);
         controlledSegments.add(segment);
-        if (controlledLeftEnd.contains(segment))
+        if (controlledLeftEnd.contains(segment)) {
             controlledFullLeft.add(segment);
+            segment.snappedToSegments.add(this);
+        }
 
         if (openingSegment)
             segment.openingSegment = true;
@@ -769,8 +893,10 @@ class Segment extends PComponent {
     public void controlRightStart(Segment segment) {
         controlledRightStart.add(segment);
         controlledSegments.add(segment);
-        if (controlledRightEnd.contains(segment))
+        if (controlledRightEnd.contains(segment)) {
             controlledFullRight.add(segment);
+            segment.snappedToSegments.add(this);
+        }
 
         if (openingSegment)
             segment.openingSegment = true;
@@ -781,8 +907,10 @@ class Segment extends PComponent {
     public void controlLeftEnd(Segment segment) {
         controlledLeftEnd.add(segment);
         controlledSegments.add(segment);
-        if (controlledLeftEnd.contains(segment))
+        if (controlledLeftEnd.contains(segment)) {
             controlledFullLeft.add(segment);
+            segment.snappedToSegments.add(this);
+        }
 
         if (closingSegment)
             segment.closingSegment = true;
@@ -793,8 +921,10 @@ class Segment extends PComponent {
     public void controlRightEnd(Segment segment) {
         controlledRightEnd.add(segment);
         controlledSegments.add(segment);
-        if (controlledRightEnd.contains(segment))
+        if (controlledRightEnd.contains(segment)) {
             controlledFullRight.add(segment);
+            segment.snappedToSegments.add(this);
+        }
 
         if (closingSegment)
             segment.closingSegment = true;
@@ -863,6 +993,15 @@ class Segment extends PComponent {
         }
     }
 
+    public void setSegmentColor(color segmentColor) {
+        this.segmentColor = segmentColor;
+        if (buttonPathColor != null) {
+            buttonPathColor.setDefaultColor(segmentColor);
+            buttonPathColor.setHoverColor(color(segmentColor.r + 15, segmentColor.g + 15, segmentColor.b + 15, 150));
+            buttonPathColor.setActiveColor(color(segmentColor.r - 10, segmentColor.g - 10, segmentColor.b - 10, 150));
+        }
+    }
+
     public void setOpeningSegment(boolean openingSegment) {
         this.openingSegment = openingSegment;
     }
@@ -891,28 +1030,47 @@ class Segment extends PComponent {
         return path.get(index);
     }
 
-    public Object[] getCrossedSegment(ArrayList<Segment> segments) {
+    public ArrayList<Object[]> getCrossedSegments(ArrayList<Segment> segments, boolean includeEndpoints) {
+        ArrayList<Object[]> crossed = new ArrayList<>();
+        float distanceThreshold = Settings.distanceToNodeThreshold * 1.5f;
+
         for (Segment segment : segments) {
             if (segment == this || segment.path == null || segment.path.size() == 0)
                 continue;
+            if (controlledSegments.contains(segment) || snappedToSegments.contains(segment))
+                continue;
 
-            // NOTE: we cut off the first and last nodes here which is probably fine because
-            // they should be anchors anyway or something? Anyhow it's needed to find the
-            // intersection point
-            for (int i = 1; i < path.size() - 2; i++) {
+            // NOTE: we use found here to not have a segment be added multiple times. I
+            // worry that if it gets added multiple times, when it then gets split when
+            // making a junction, the next intersection (with that same segment) will then
+            // get messed up because now that segments is actually a different segment
+            boolean found = false;
+            int startIndex = (includeEndpoints) ? 0 : 1;
+            int endIndexMe = (includeEndpoints) ? path.size() - 1 : path.size() - 2;
+            int endIndexOther = (includeEndpoints) ? segment.path.size() - 1 : segment.path.size() - 2;
+            for (int i = startIndex; i < endIndexMe; i++) {
                 PVector node = path.get(i);
-                for (int j = 1; j < segment.path.size() - 2; j++) {
+                for (int j = startIndex; j < endIndexOther; j++) {
                     PVector otherNode = segment.path.get(j);
-                    if (node.dist(otherNode) < Settings.distanceToNodeThreshold) {
-                        PVector intersection = findIntersection(path.get(i - 1), path.get(i + 1),
-                                segment.path.get(j - 1), segment.path.get(j + 1));
-                        return new Object[] { segment, intersection };
+                    if (node.dist(otherNode) < distanceThreshold) {
+                        int iFirst = (i >= 1) ? i - 1 : 0;
+                        int iLast = (i <= segment.path.size() - 2) ? i + 1 : i;
+                        int jFirst = (j >= 1) ? j - 1 : 0;
+                        int jLast = (j <= segment.path.size() - 2) ? j + 1 : j;
+
+                        PVector intersection = findIntersection(path.get(iFirst), path.get(iLast),
+                                segment.path.get(jFirst), segment.path.get(jLast));
+                        crossed.add(new Object[] { segment, intersection });
+                        found = true;
+                        break;
                     }
                 }
+                if (found)
+                    break;
             }
         }
 
-        return null;
+        return crossed;
     }
 
     private PVector findIntersection(PVector p1, PVector p2, PVector p3, PVector p4) {

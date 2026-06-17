@@ -277,7 +277,7 @@ public class InputField extends Interactable {
             } else {
                 if (numbersOnly) {
                     // numbers or decimal point
-                    if ((key >= '0' && key <= '9') || key == '.' || key == ',') {
+                    if ((key >= '0' && key <= '9') || key == '.' || key == ',' || key == '-') {
                         text += key;
                     }
                 } else {

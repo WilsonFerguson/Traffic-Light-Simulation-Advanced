@@ -23,6 +23,11 @@ class Cursor extends PComponent {
     public void update(Segment currentSegment, ArrayList<Anchor> anchors, ArrayList<Segment> segments) {
         resetVariables();
 
+        if (builder.hoveringSegmentInfo())
+            return;
+
+        // TODO: make it so that you can have multiple snappings at the same time (such
+        // as angles and walls)
         if (snapLeftAndRightOfSegment(currentSegment, segments))
             return;
         if (snapAnchors(currentSegment, anchors))

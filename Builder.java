@@ -13,6 +13,9 @@ class Builder extends PComponent {
     Segment currentSegment;
     boolean segmentPlaced;
 
+    int parallelNumSegments = 1;
+    boolean parallelMode = false;
+
     public Builder(Sketch sketch) {
         anchors = new ArrayList<Anchor>();
         segments = new ArrayList<Segment>();
@@ -34,20 +37,20 @@ class Builder extends PComponent {
                 currentSegment.setEnd(cursor.pos);
                 currentSegment.setEndHeading(
                         PVector.sub(currentSegment.getEndNode(), currentSegment.getStartNode()).heading(), true);
-                currentSegment.updatePath(true);
+                currentSegment.updatePath();
             }
 
             if (cursor.selectedStartControlPoint != null) {
                 float heading = PVector.sub(cursor.pos, currentSegment.getStartNode()).heading();
                 float mag = PVector.sub(cursor.pos, currentSegment.getStartNode()).mag();
                 cursor.selectedStartControlPoint.setStartControlPoint(heading, mag);
-                currentSegment.updatePath(true);
+                currentSegment.updatePath();
             }
             if (cursor.selectedEndControlPoint != null) {
                 float heading = PVector.sub(currentSegment.getEndNode(), cursor.pos).heading();
                 float mag = PVector.sub(cursor.pos, currentSegment.getEndNode()).mag();
                 cursor.selectedEndControlPoint.setEndControlPoint(heading, mag);
-                currentSegment.updatePath(true);
+                currentSegment.updatePath();
             }
         } else {
         }
@@ -71,6 +74,21 @@ class Builder extends PComponent {
             currentAnchor.show();
         }
         if (currentSegment != null) {
+            if (parallelMode && parallelNumSegments != 0 && !segmentPlaced) {
+                int offset = (parallelNumSegments < 0) ? -1 : 1;
+
+                fill(currentSegment.segmentColor);
+                stroke(255);
+                strokeWeight(3);
+                noStroke();
+
+                for (int i = 0; i < abs(parallelNumSegments); i++) {
+                    ArrayList<PVector> path = currentSegment.parallelSegment(currentSegment.segmentWidth * (i + 1),
+                            offset);
+                    currentSegment.drawPath(path);
+                }
+            }
+
             currentSegment.showSelected();
         }
         if (currentAnchor == null && !sketch.running) {
@@ -202,6 +220,13 @@ class Builder extends PComponent {
             return;
         }
 
+        currentSegment.segmentEditorPanel.setActive(false);
+        for (UIElement element : currentSegment.segmentEditorPanel.getElements()) {
+            if (element == currentSegment.colorPickerPathColor)
+                continue;
+            element.setActive(false);
+        }
+
         segments.remove(currentSegment);
 
         for (Segment segment : currentSegment.snappedToSegments) {
@@ -292,7 +317,7 @@ class Builder extends PComponent {
         if (currentSegment.type == SegmentType.STRAIGHT) {
             currentSegment.setHeadings(heading, heading);
             currentSegment.setPreviousEndHeading(heading);
-            currentSegment.updatePath(true);
+            currentSegment.updatePath();
         }
 
         if (cursor.snappingWall) {
@@ -338,18 +363,29 @@ class Builder extends PComponent {
         next.startAnchor = anchor;
         anchor.beginSegments.add(next);
 
-        original.setEndNode(anchor.pos);
-        next.setStartNode(anchor.pos);
+        original.setEndNode(anchor.pos.copy());
+        next.setStartNode(anchor.pos.copy());
 
-        original.updatePath(true);
-        next.updatePath(true);
+        int nodeBeforeIndex = 0;
+        for (int i = 0; i < original.path.size(); i++) {
+            if (original.path.get(i).dist(anchor.pos) < Settings.distanceToNodeThreshold) {
+                nodeBeforeIndex = i - 1;
+                break;
+            }
+        }
+        nodeBeforeIndex = max(0, nodeBeforeIndex);
+        float targetHeading = PVector.sub(anchor.pos, original.path.get(nodeBeforeIndex)).heading();
+        original.setEndHeading(targetHeading, true);
+
+        original.updatePath();
+        next.updatePath();
 
         segments.add(next);
         return next;
     }
 
-    private void makeTJunction(Segment hovered, Segment comingIn) {
-        Segment next = splitSegment(hovered, currentAnchor);
+    private void makeTJunction(Segment hovered, Segment comingIn, Anchor anchor) {
+        Segment next = splitSegment(hovered, anchor);
         comingIn.addSegmentNext(next);
     }
 
@@ -392,13 +428,82 @@ class Builder extends PComponent {
 
         // If we are hovering a pre-existing segment, then we need to split that one
         if (hovered != null) {
-            makeTJunction(hovered, comingIn);
+            makeTJunction(hovered, comingIn, currentAnchor);
+            if (parallelMode && parallelNumSegments != 0) {
+                int offset = (parallelNumSegments < 0) ? -1 : 1;
+
+                // Make segments, find where they intersect segment, make T Junction
+                Segment controllingSegment = comingIn;
+                for (int i = 0; i < abs(parallelNumSegments); i++) {
+                    PVector start = PVector.add(comingIn.getStartNode(),
+                            PVector.sub(comingIn.getNode(1), comingIn.getStartNode()).copy().rotate(offset * PI / 2)
+                                    .setMag(comingIn.segmentWidth * (i + 1)));
+                    Anchor anchor = new Anchor(this, start.copy());
+                    anchors.add(anchor);
+
+                    Segment segment = new Segment(this, start);
+                    segment.setStartAnchor(anchor);
+                    segment.setStartHeading(comingIn.getStraightHeading(), false);
+                    if (offset == 1) {
+                        controllingSegment.controlRightStart(segment);
+                        controllingSegment.controlRightEnd(segment);
+                        for (Segment previousSegment : controllingSegment.segmentsPrevious) {
+                            for (Segment seg : previousSegment.controlledFullRight) {
+                                seg.addSegmentNext(segment);
+                            }
+                        }
+                    } else {
+                        controllingSegment.controlLeftStart(segment);
+                        controllingSegment.controlLeftEnd(segment);
+                        for (Segment previousSegment : controllingSegment.segmentsPrevious) {
+                            for (Segment seg : previousSegment.controlledFullLeft) {
+                                seg.addSegmentNext(segment);
+                            }
+                        }
+                    }
+
+                    segment.setType(comingIn.type);
+                    segment.setTrafficType(comingIn.trafficType);
+                    segment.setPriority(comingIn.priority);
+                    segment.setSegmentColor(comingIn.segmentColor);
+                    segment.setOpeningSegment(comingIn.openingSegment);
+                    segment.setClosingSegment(comingIn.closingSegment);
+
+                    segment.path = comingIn.parallelSegment(comingIn.segmentWidth * (i + 1), offset);
+                    segments.add(segment);
+
+                    Anchor endAnchor = new Anchor(this, segment.getEndNode().copy());
+                    anchors.add(endAnchor);
+                    endAnchor.setClosingAnchor(segment.closingSegment);
+                    segment.setEndAnchor(endAnchor);
+
+                    ArrayList<Object[]> data = segment.getCrossedSegments(segments, true);
+                    // NOTE: we only choose the last one here because for now we are not making any
+                    // intermediate 4 way junctions
+                    if (data.size() > 0) {
+                        Anchor junctionAnchor = new Anchor(this, (PVector) data.getLast()[1]);
+                        anchors.add(junctionAnchor);
+                        makeTJunction((Segment) data.getLast()[0], segment, junctionAnchor);
+                    }
+
+                    controllingSegment = segment;
+                }
+
+                comingIn.updateControlledPaths();
+            }
         } else {
+            // TODO: make sure that if no junctions are made we still make the parallel
+            // segments
+
             // If we crossed a pre-existing segment, then we need to make a 4-way junction
             // Segment crossed = comingIn.getCrossedSegment(segments);
-            Object[] data = comingIn.getCrossedSegment(segments);
-            if (data != null) {
-                make4WayJunction((Segment) data[0], comingIn, (PVector) data[1]);
+            ArrayList<Object[]> data = comingIn.getCrossedSegments(segments, false);
+            if (data.size() > 0) {
+                for (Object[] d : data) {
+                    Segment crossed = (Segment) d[0];
+                    PVector intersection = (PVector) d[1];
+                    make4WayJunction(crossed, comingIn, intersection);
+                }
             }
         }
     }
@@ -410,14 +515,14 @@ class Builder extends PComponent {
         if (currentSegment.type == SegmentType.STRAIGHT) {
             currentSegment.setHeadings(heading, heading);
             currentSegment.setPreviousEndHeading(heading);
-            currentSegment.updatePath(true);
+            currentSegment.updatePath();
         }
         boolean updatedHeading = false;
         for (Segment segment : currentAnchor.beginSegments) {
             currentSegment.addSegmentNext(segment);
             if (!updatedHeading && currentSegment.type == SegmentType.BEZIER) {
                 currentSegment.setEndControlPoint(segment.startHeading, segment.startControlPointMag);
-                currentSegment.updatePath(true);
+                currentSegment.updatePath();
                 updatedHeading = true;
             }
         }
@@ -490,7 +595,7 @@ class Builder extends PComponent {
                 } else {
                     currentSegment.setType(SegmentType.STRAIGHT);
                 }
-                currentSegment.updatePath(true);
+                currentSegment.updatePath();
             }
         }
     }

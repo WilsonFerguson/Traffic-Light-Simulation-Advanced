@@ -49,10 +49,10 @@ class Anchor extends PComponent {
         }
 
         for (Segment segment : beginSegments) {
-            segment.updatePath(true);
+            segment.updatePath();
         }
         for (Segment segment : endSegments) {
-            segment.updatePath(true);
+            segment.updatePath();
         }
     }
 
