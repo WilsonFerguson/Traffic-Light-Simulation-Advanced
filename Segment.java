@@ -339,6 +339,8 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 builder.parallelNumSegments--;
+                if (builder.parallelNumSegments >= -1 && builder.parallelNumSegments <= 1)
+                    builder.parallelNumSegments = -2;
                 if (builder.parallelNumSegments < -99)
                     builder.parallelNumSegments = -99;
                 inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
@@ -352,11 +354,18 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 try {
+                    boolean originallyPositive = builder.parallelNumSegments >= 0;
                     builder.parallelNumSegments = round(parseFloat(inputFieldParallel.getText()));
                     if (builder.parallelNumSegments >= 99)
                         builder.parallelNumSegments = 99;
                     if (builder.parallelNumSegments < -99)
                         builder.parallelNumSegments = -99;
+                    if (builder.parallelNumSegments >= -1 && builder.parallelNumSegments <= 1) {
+                        if (originallyPositive)
+                            builder.parallelNumSegments = 2;
+                        else
+                            builder.parallelNumSegments = -2;
+                    }
                 } catch (Exception e) {
                 }
             }
@@ -365,9 +374,17 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 try {
+                    boolean originallyPositive = builder.parallelNumSegments >= 0;
                     builder.parallelNumSegments = round(parseFloat(inputFieldParallel.getText()));
                     if (builder.parallelNumSegments >= 99 || builder.parallelNumSegments < -99) {
                         builder.parallelNumSegments = (builder.parallelNumSegments < -99) ? -99 : 99;
+                        inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
+                    }
+                    if (builder.parallelNumSegments >= -1 && builder.parallelNumSegments <= 1) {
+                        if (originallyPositive)
+                            builder.parallelNumSegments = 2;
+                        else
+                            builder.parallelNumSegments = -2;
                         inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
                     }
                 } catch (Exception e) {
@@ -381,6 +398,8 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 builder.parallelNumSegments++;
+                if (builder.parallelNumSegments >= -1 && builder.parallelNumSegments <= 1)
+                    builder.parallelNumSegments = 2;
                 if (builder.parallelNumSegments >= 99)
                     builder.parallelNumSegments = 99;
                 inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
@@ -1058,7 +1077,7 @@ class Segment extends PComponent {
         return crossed;
     }
 
-    private PVector findIntersection(PVector p1, PVector p2, PVector p3, PVector p4) {
+    public PVector findIntersection(PVector p1, PVector p2, PVector p3, PVector p4) {
         float x1 = p1.x;
         float y1 = p1.y;
         float x2 = p2.x;

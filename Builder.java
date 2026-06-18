@@ -13,7 +13,7 @@ class Builder extends PComponent {
     Segment currentSegment;
     boolean segmentPlaced;
 
-    int parallelNumSegments = 1;
+    int parallelNumSegments = 2;
     boolean parallelMode = false;
 
     public Builder(Sketch sketch) {
@@ -74,7 +74,7 @@ class Builder extends PComponent {
             currentAnchor.show();
         }
         if (currentSegment != null) {
-            if (parallelMode && parallelNumSegments != 0 && !segmentPlaced) {
+            if (parallelMode && (parallelNumSegments < -1 || parallelNumSegments > 1) && !segmentPlaced) {
                 int offset = (parallelNumSegments < 0) ? -1 : 1;
 
                 fill(currentSegment.segmentColor);
@@ -82,8 +82,8 @@ class Builder extends PComponent {
                 strokeWeight(3);
                 noStroke();
 
-                for (int i = 0; i < abs(parallelNumSegments); i++) {
-                    ArrayList<PVector> path = currentSegment.parallelSegment(currentSegment.segmentWidth * (i + 1),
+                for (int i = 1; i < abs(parallelNumSegments); i++) {
+                    ArrayList<PVector> path = currentSegment.parallelSegment(currentSegment.segmentWidth * (i),
                             offset);
                     currentSegment.drawPath(path);
                 }
@@ -285,14 +285,14 @@ class Builder extends PComponent {
         if (hoveredAnchor != null) {
             if (hoveredAnchor.endSegments.size() == 0) {
                 selectAnchor(hoveredAnchor);
-                newSegment(cursor.pos);
+                newSegment(hoveredAnchor.pos);
                 return;
             }
 
             selectAnchor(hoveredAnchor);
             Segment previousFirst = hoveredAnchor.endSegments.iterator().next();
             Set<Segment> previousSegments = hoveredAnchor.endSegments;
-            newSegment(cursor.pos, previousFirst.getStraightHeading());
+            newSegment(hoveredAnchor.pos, previousFirst.getStraightHeading());
 
             for (Segment previous : previousSegments) {
                 currentSegment.addSegmentPrevious(previous);
@@ -478,7 +478,7 @@ class Builder extends PComponent {
         int offset = (parallelNumSegments < 0) ? -1 : 1;
 
         Segment controllingSegment = baseSegment;
-        for (int i = 0; i < abs(parallelNumSegments); i++) {
+        for (int i = 1; i < abs(parallelNumSegments); i++) {
             Segment segment = makeParallelSegment(controllingSegment, offset);
             controllingSegment = segment;
         }
@@ -533,7 +533,7 @@ class Builder extends PComponent {
         // If we are hovering a pre-existing segment, then we need to split that one
         if (hovered != null) {
             makeTJunction(hovered, comingIn, currentAnchor);
-            if (parallelMode && parallelNumSegments != 0) {
+            if (parallelMode && (parallelNumSegments < -1 || parallelNumSegments > 1)) {
                 makeParallelSegments(comingIn);
             }
         } else {
@@ -551,7 +551,7 @@ class Builder extends PComponent {
                 }
             }
 
-            if (parallelMode && parallelNumSegments != 0) {
+            if (parallelMode && (parallelNumSegments < -1 || parallelNumSegments > 1)) {
                 for (Segment base : bases) {
                     makeParallelSegments(base);
                 }
@@ -593,7 +593,7 @@ class Builder extends PComponent {
         if (previous.endHeading != -Float.MIN_VALUE)
             currentSegment.setStartHeading(previous.endHeading, true);
 
-        if (parallelMode && parallelNumSegments != 0) {
+        if (parallelMode && (parallelNumSegments < -1 || parallelNumSegments > 1)) {
             makeParallelSegments(comingIn);
         }
     }
