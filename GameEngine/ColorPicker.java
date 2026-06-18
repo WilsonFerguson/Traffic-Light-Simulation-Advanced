@@ -88,7 +88,7 @@ public class ColorPicker extends Interactable {
     /**
      * Sets the position of the preview based on the current color
      */
-    private void setColorPreviewPosition() {
+    public void setColorPreviewPosition() {
         float x = map(saturation, 0, 1, pos.x - size.x / 2, pos.x + size.x / 2);
         float y = map(brightness, 1, 0, pos.y - size.y / 2 + size.y * hueSelectorHeight,
                 pos.y + size.y / 2);

@@ -8,6 +8,7 @@ class Cursor extends PComponent {
     boolean snappingToLeftOfSegment = false;
     boolean snappingToRightOfSegment = false;
     Segment snappingToSegment;
+    PVector snappingLeftRightPoint = null;
     boolean snappingAnchor = false;
     boolean snappingWall = false;
     boolean snapping90 = false;
@@ -15,6 +16,12 @@ class Cursor extends PComponent {
     PVector snappingHeadingPoint = null;
     boolean snappingGuidelines = false;
     PVector snappingGuidelinesPoint = null;
+
+    /**
+     * Left/right snapping, anchor snapping, wall snapping, 90 snapping, heading
+     * snapping, guidelines snapping
+     */
+    boolean[] enabledSnappingOptions = { true, true, true, true, true, true };
 
     boolean fixedX = false;
     boolean fixedY = false;
@@ -34,15 +41,17 @@ class Cursor extends PComponent {
             return;
 
         // Absolute snaps (cannot combine with other snapping)
-        if (snapLeftAndRightOfSegment(currentSegment, segments))
+        if (enabledSnappingOptions[0] && snapLeftAndRightOfSegment(currentSegment, segments))
             return;
-        if (snapAnchors(currentSegment, anchors))
+        if (enabledSnappingOptions[1] && snapAnchors(currentSegment, anchors))
             return;
 
         // Combination snaps
-        snapWalls();
+        if (enabledSnappingOptions[2])
+            snapWalls();
         snapAngles(currentSegment);
-        snapGuidelines();
+        if (enabledSnappingOptions[5])
+            snapGuidelines();
     }
 
     public void show() {
@@ -57,6 +66,7 @@ class Cursor extends PComponent {
         snappingToLeftOfSegment = false;
         snappingToRightOfSegment = false;
         snappingToSegment = null;
+        snappingLeftRightPoint = null;
         snappingAnchor = false;
         snappingWall = false;
         snapping90 = false;
@@ -90,12 +100,14 @@ class Cursor extends PComponent {
                 pos = pseudoAnchorLeft;
                 snappingToLeftOfSegment = true;
                 snappingToSegment = segment;
+                snappingLeftRightPoint = node;
                 return true;
             }
             if (PVector.dist(pos, pseudoAnchorRight) < segment.segmentWidth / 2) {
                 pos = pseudoAnchorRight;
                 snappingToRightOfSegment = true;
                 snappingToSegment = segment;
+                snappingLeftRightPoint = node;
                 return true;
             }
         }
@@ -155,23 +167,29 @@ class Cursor extends PComponent {
         float heading = PVector.sub(pos, start).heading();
 
         // Always trying snapping to a global 90 degree
-        float k = round(heading / (PI / 2));
-        boolean rightSnapping = k == 0 && abs(mouseY - start.y) < pixelMargin;
-        boolean topSnapping = k == -1 && abs(mouseX - start.x) < pixelMargin;
-        boolean leftSnapping = abs(k) == 2 && abs(mouseY - start.y) < pixelMargin;
-        boolean bottomSnapping = k == 1 && abs(mouseX - start.x) < pixelMargin;
-        if ((rightSnapping || leftSnapping) && !fixedY) {
-            fixedY = true;
-            pos.y = start.y;
-            snapping90 = true;
-            return true;
+        if (enabledSnappingOptions[3]
+                && (!builder.segmentPlaced || selectedStartControlPoint != null || selectedEndControlPoint != null)) {
+            float k = round(heading / (PI / 2));
+            boolean rightSnapping = k == 0 && abs(mouseY - start.y) < pixelMargin;
+            boolean topSnapping = k == -1 && abs(mouseX - start.x) < pixelMargin;
+            boolean leftSnapping = abs(k) == 2 && abs(mouseY - start.y) < pixelMargin;
+            boolean bottomSnapping = k == 1 && abs(mouseX - start.x) < pixelMargin;
+            if ((rightSnapping || leftSnapping) && !fixedY) {
+                fixedY = true;
+                pos.y = start.y;
+                snapping90 = true;
+                return true;
+            }
+            if ((topSnapping || bottomSnapping) && !fixedX) {
+                fixedX = true;
+                pos.x = start.x;
+                snapping90 = true;
+                return true;
+            }
         }
-        if ((topSnapping || bottomSnapping) && !fixedX) {
-            fixedX = true;
-            pos.x = start.x;
-            snapping90 = true;
-            return true;
-        }
+
+        if (!enabledSnappingOptions[4])
+            return false;
 
         if (selectedStartControlPoint != null) {
             for (Segment previous : currentSegment.segmentsPrevious) {
@@ -280,41 +298,62 @@ class Cursor extends PComponent {
     }
 
     private boolean snapGuidelines() {
-        if ((fixedX && fixedY) || builder.currentSegment == null)
+        if ((fixedX && fixedY))
             return false;
 
         float radianMargin = 0.1f;
         float pixelMargin = 15;
 
+        float bestDistance = Float.MAX_VALUE;
+        PVector bestNode = null;
+        PVector bestSecondary = null;
         for (Segment segment : builder.segments) {
             if (segment == builder.currentSegment)
                 continue;
 
-            boolean done = snapGuideline(segment.getNode(0), segment.getNode(1), radianMargin, pixelMargin);
-            if (done)
-                return true;
-            done = snapGuideline(segment.path.getLast(), segment.getNode(segment.path.size() - 2), radianMargin,
-                    pixelMargin);
-            if (done)
-                return true;
+            // TODO: confirm that the following is correct and not excessive
+            if (builder.currentSegment != null && (builder.currentSegment.segmentsNext.contains(segment)
+                    || builder.currentSegment.segmentsPrevious.contains(segment)))
+                continue;
+
+            float dist = snapGuideline(segment.getNode(0), segment.getNode(1), radianMargin, pixelMargin, false);
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                bestNode = segment.getNode(0);
+                bestSecondary = segment.getNode(1);
+            }
+            dist = snapGuideline(segment.path.getLast(), segment.getNode(segment.path.size() - 2), radianMargin,
+                    pixelMargin, false);
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                bestNode = segment.path.getLast();
+                bestSecondary = segment.getNode(segment.path.size() - 2);
+            }
+        }
+
+        if (bestNode != null) {
+            snapGuideline(bestNode, bestSecondary, radianMargin, pixelMargin, true);
+            return true;
         }
 
         return false;
     }
 
-    private boolean snapGuideline(PVector node, PVector secondary, float radianMargin, float pixelMargin) {
+    private float snapGuideline(PVector node, PVector secondary, float radianMargin, float pixelMargin,
+            boolean updatePos) {
         if (snappingHeadingPoint == null) {
             float cursorHeading = PVector.sub(pos, node).heading();
             float targetHeading = PVector.sub(node, secondary).heading();
 
             float headingDiff = abs(cursorHeading - targetHeading);
             if (abs(headingDiff) < radianMargin) {
+                float dist = PVector.dist(node, pos);
+                if (!updatePos)
+                    return dist;
                 if (!fixedX && !fixedY) {
-                    float dist = PVector.dist(node, pos);
                     pos = PVector.fromAngle(targetHeading).setMag(dist).add(node);
                     snappingGuidelines = true;
                     snappingGuidelinesPoint = node;
-                    return true;
                 } else {
                     if (fixedX) {
                         pos.y = node.y + (pos.x - node.x) * tan(targetHeading);
@@ -326,26 +365,66 @@ class Cursor extends PComponent {
 
                     snappingGuidelines = true;
                     snappingGuidelinesPoint = node;
-                    return true;
+                    return dist;
                 }
             }
         } else {
+            if (builder.currentSegment == null)
+                return Float.MAX_VALUE;
+
             // Find intersection
             PVector intersection = builder.currentSegment.findIntersection(secondary, node, snappingHeadingPoint, pos);
             if (intersection == null)
-                return false;
+                return Float.MAX_VALUE;
 
-            if (intersection.dist(pos) < pixelMargin) {
+            float dist = intersection.dist(pos);
+            if (dist < pixelMargin) {
+                if (!updatePos)
+                    return dist;
+
                 pos = intersection;
                 fixedX = true;
                 fixedY = true;
                 snappingGuidelines = true;
                 snappingGuidelinesPoint = node;
-                return true;
+                return dist;
             }
         }
 
-        return false;
+        return Float.MAX_VALUE;
+    }
+
+    public void showSnapping() {
+        stroke(230);
+        strokeWeight(5);
+        noFill();
+        float mag = 45;
+
+        // Left/right of segment snapping
+        if (snappingToLeftOfSegment || snappingToRightOfSegment) {
+            line(snappingLeftRightPoint, pos);
+        }
+        // Anchor snapping
+        if (snappingAnchor) {
+            circle(pos, Settings.sizeAnchor);
+        }
+        // Wall snapping
+        if (snappingWall) {
+            if (pos.x == 0 || pos.x == width)
+                line(pos.x, pos.y - mag, pos.x, pos.y + mag);
+            if (pos.y == 0 || pos.y == height)
+                line(pos.x - mag, pos.y, pos.x + mag, pos.y);
+        }
+        // Angle snapping
+        if (snappingHeadingPoint != null) {
+            line(snappingHeadingPoint, PVector.sub(pos, snappingHeadingPoint).setMag(mag).add(snappingHeadingPoint));
+            line(snappingHeadingPoint,
+                    PVector.sub(pos, snappingHeadingPoint).rotate(PI / 2).setMag(mag).add(snappingHeadingPoint));
+        }
+        // Guidelines
+        if (snappingGuidelinesPoint != null) {
+            line(snappingGuidelinesPoint, pos);
+        }
     }
 
     public void mousePressed() {

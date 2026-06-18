@@ -7,6 +7,7 @@ class Segment extends PComponent {
 
     Panel segmentEditorPanel;
     ArrayList<Button> buttonsTrafficTypes;
+    ArrayList<Button> buttonsSnappingOptions;
     Button buttonPathColor;
     ColorPicker colorPickerPathColor;
     Text textPathColor;
@@ -95,6 +96,7 @@ class Segment extends PComponent {
         float margin = w * 0.2f;
 
         createButtonsTrafficType(w, margin);
+        createButtonsSnappingOptions(w, margin);
         createButtonPathColor(w, margin);
         createInputFieldSegmentWidth(w, margin);
         createButtonsSegmentPriority(w, margin);
@@ -136,11 +138,7 @@ class Segment extends PComponent {
 
             Button button = new Button(x, 0, w, w, texts[i]);
 
-            if (trafficTypeButton == trafficType) {
-                button.setDefaultColor(Settings.buttonAccentDefault);
-                button.setHoverColor(Settings.buttonAccentHover);
-                button.setActiveColor(Settings.buttonAccentActive);
-            }
+            setButtonColor(button, trafficTypeButton == trafficType);
 
             button.onClick(new Runnable() {
                 @Override
@@ -148,25 +146,48 @@ class Segment extends PComponent {
                     setTrafficType(trafficTypeButton);
 
                     for (Button b : buttonsTrafficTypes) {
-                        b.setDefaultColor(Settings.buttonDefault);
-                        b.setHoverColor(Settings.buttonHover);
-                        b.setActiveColor(Settings.buttonActive);
+                        setButtonColor(b, false);
                     }
 
-                    button.setDefaultColor(Settings.buttonAccentDefault);
-                    button.setHoverColor(Settings.buttonAccentHover);
-                    button.setActiveColor(Settings.buttonAccentActive);
+                    setButtonColor(button, true);
                 }
             });
 
             buttonsTrafficTypes.add(button);
             segmentEditorPanel.addElementFromTop(button, false);
         }
+    }
 
-        segmentEditorPanel.incrementElementHeight(margin + w);
+    public void createButtonsSnappingOptions(float w, float margin) {
+        segmentEditorPanel.incrementElementHeight(w + margin);
+
+        int numButtons = 6;
+        buttonsSnappingOptions = new ArrayList<Button>(numButtons);
+        String[] texts = new String[] { "L/R", "A", "W", "90", "H", "G" };
+
+        for (int i = 0; i < numButtons; i++) {
+            float x = calculateButtonX(i, w, margin);
+            Button button = new Button(x, 0, w, w, texts[i]);
+
+            setButtonColor(button, builder.cursor.enabledSnappingOptions[i]);
+
+            final int index = i;
+            button.onClick(new Runnable() {
+                @Override
+                public void run() {
+                    builder.cursor.enabledSnappingOptions[index] = !builder.cursor.enabledSnappingOptions[index];
+                    setButtonColor(button, builder.cursor.enabledSnappingOptions[index]);
+                }
+            });
+
+            buttonsSnappingOptions.add(button);
+            segmentEditorPanel.addElementFromTop(button, false);
+        }
     }
 
     public void createButtonPathColor(float w, float margin) {
+        segmentEditorPanel.incrementElementHeight(w + margin);
+
         textPathColor = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Path color")
                 .setTextAlignment(TextAlignment.LEFT);
 
@@ -321,15 +342,7 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 builder.parallelMode = !builder.parallelMode;
-                if (builder.parallelMode) {
-                    buttonParallel.setDefaultColor(Settings.buttonAccentDefault);
-                    buttonParallel.setHoverColor(Settings.buttonAccentHover);
-                    buttonParallel.setActiveColor(Settings.buttonAccentActive);
-                } else {
-                    buttonParallel.setDefaultColor(Settings.buttonDefault);
-                    buttonParallel.setHoverColor(Settings.buttonHover);
-                    buttonParallel.setActiveColor(Settings.buttonActive);
-                }
+                setButtonColor(buttonParallel, builder.parallelMode);
             }
         });
 
@@ -422,6 +435,10 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 setType(SegmentType.STRAIGHT);
+
+                setButtonColor(buttonTypeStraight, true);
+                setButtonColor(buttonTypeBezier, false);
+
                 updatePath();
             }
         });
@@ -431,12 +448,31 @@ class Segment extends PComponent {
             @Override
             public void run() {
                 setType(SegmentType.BEZIER);
+
+                setButtonColor(buttonTypeStraight, false);
+                setButtonColor(buttonTypeBezier, true);
+
                 updatePath();
             }
         });
 
+        setButtonColor(buttonTypeStraight, type == SegmentType.STRAIGHT);
+        setButtonColor(buttonTypeBezier, type == SegmentType.BEZIER);
+
         segmentEditorPanel.addElementFromTop(buttonTypeStraight, false);
         segmentEditorPanel.addElementFromTop(buttonTypeBezier, false);
+    }
+
+    private void setButtonColor(Button button, boolean active) {
+        if (active) {
+            button.setDefaultColor(Settings.buttonAccentDefault);
+            button.setHoverColor(Settings.buttonAccentHover);
+            button.setActiveColor(Settings.buttonAccentActive);
+        } else {
+            button.setDefaultColor(Settings.buttonDefault);
+            button.setHoverColor(Settings.buttonHover);
+            button.setActiveColor(Settings.buttonActive);
+        }
     }
 
     public void updatePath() {
@@ -624,30 +660,41 @@ class Segment extends PComponent {
         }
 
         float margin = segmentEditorPanel.size.x / 10;
-        // float x, y;
-        // if (path.size() == 0) {
-        // x = start.x + segmentEditorPanel.size.x / 2 + margin;
-        // y = start.y;
-        // } else {
-        // x = path.get(floor(path.size() / 2)).x + segmentEditorPanel.size.x / 2 +
-        // margin;
-        // y = path.get(floor(path.size() / 2)).y;
-        // }
-        // if (x + segmentEditorPanel.size.x / 2 > width) {
-        // if (path.size() == 0) {
-        // x = start.x - segmentEditorPanel.size.x / 2 - margin;
-        // } else {
-        // x = path.get(floor(path.size() / 2)).x - segmentEditorPanel.size.x / 2 -
-        // margin;
-        // }
-        // }
-        //
-        // PVector targetPos = PVector.lerp(segmentEditorPanel.pos, new PVector(x, y),
-        // 0.1);
-        // segmentEditorPanel.setPos(targetPos);
         segmentEditorPanel.setPos(margin + segmentEditorPanel.size.x / 2, margin + segmentEditorPanel.size.y / 2);
 
         segmentEditorPanel.draw();
+    }
+
+    public void updateUIWithValues() {
+        for (int i = 0; i < buttonsTrafficTypes.size(); i++) {
+            setButtonColor(buttonsTrafficTypes.get(i), trafficType == TrafficType.values()[i]);
+        }
+
+        for (int i = 0; i < buttonsSnappingOptions.size(); i++) {
+            setButtonColor(buttonsSnappingOptions.get(i), builder.cursor.enabledSnappingOptions[i]);
+        }
+
+        colorPickerPathColor.setColor(segmentColor);
+        colorPickerPathColor.setColorPreviewPosition();
+        buttonPathColor.setDefaultColor(color(segmentColor, 150));
+        buttonPathColor.setHoverColor(color(segmentColor.r + 15, segmentColor.g + 15, segmentColor.b + 15, 150));
+        buttonPathColor.setActiveColor(color(segmentColor.r - 10, segmentColor.g - 10, segmentColor.b - 10, 150));
+
+        float value = segmentWidth / Settings.pixelsPerMeter;
+        try {
+            String text = str((int) value);
+            inputFieldSegmentWidth.setText(text);
+        } catch (Exception e) {
+            inputFieldSegmentWidth.setText(String.valueOf(segmentWidth / Settings.pixelsPerMeter));
+        }
+
+        inputFieldSegmentPriority.setText(String.valueOf(priority));
+
+        setButtonColor(buttonParallel, builder.parallelMode);
+        inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
+
+        setButtonColor(buttonTypeStraight, type == SegmentType.STRAIGHT);
+        setButtonColor(buttonTypeBezier, type == SegmentType.BEZIER);
     }
 
     public void drawPath(ArrayList<PVector> pathToTrace) {

@@ -91,7 +91,8 @@ class Builder extends PComponent {
 
             currentSegment.showSelected();
         }
-        if (currentAnchor == null && !sketch.running) {
+        if (!sketch.running) {
+            cursor.showSnapping();
             cursor.show();
         }
     }
@@ -204,6 +205,7 @@ class Builder extends PComponent {
 
     private void selectSegment(Segment segment) {
         currentSegment = segment;
+        currentSegment.updateUIWithValues();
     }
 
     private void deselectAnchor() {
@@ -303,6 +305,8 @@ class Builder extends PComponent {
             if (previousFirst.endHeading != -Float.MIN_VALUE)
                 currentSegment.setStartHeading(previousFirst.endHeading, true);
 
+            currentSegment.updateUIWithValues();
+
             return;
         }
     }
@@ -379,6 +383,9 @@ class Builder extends PComponent {
 
         original.updatePath();
         next.updatePath();
+
+        original.updateUIWithValues();
+        next.updateUIWithValues();
 
         segments.add(next);
         return next;
@@ -530,6 +537,8 @@ class Builder extends PComponent {
         if (previous.endHeading != -Float.MIN_VALUE)
             currentSegment.setStartHeading(previous.endHeading, true);
 
+        currentSegment.updateUIWithValues();
+
         // If we are hovering a pre-existing segment, then we need to split that one
         if (hovered != null) {
             makeTJunction(hovered, comingIn, currentAnchor);
@@ -661,6 +670,7 @@ class Builder extends PComponent {
                 } else {
                     currentSegment.setType(SegmentType.STRAIGHT);
                 }
+                currentSegment.updateUIWithValues();
                 currentSegment.updatePath();
             }
         }
