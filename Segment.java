@@ -12,8 +12,9 @@ class Segment extends PComponent {
     ColorPicker colorPickerPathColor;
     Text textPathColor;
     Text textSegmentWidth;
-    Text textSegmentWidthUnits;
+    Button buttonSegmentWidthDecrease;
     InputField inputFieldSegmentWidth;
+    Button buttonSegmentWidthIncrease;
     Text textSegmentPriority;
     InputField inputFieldSegmentPriority;
     Button buttonSegmentPriorityDecrease;
@@ -237,8 +238,27 @@ class Segment extends PComponent {
     public void createInputFieldSegmentWidth(float w, float margin) {
         segmentEditorPanel.incrementElementHeight(margin + w);
 
-        textSegmentWidth = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Path width")
+        textSegmentWidth = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Path width(m)")
                 .setTextAlignment(TextAlignment.LEFT);
+
+        buttonSegmentWidthDecrease = new Button(calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w, w,
+                "-");
+        buttonSegmentWidthDecrease.onClick(new Runnable() {
+            @Override
+            public void run() {
+                segmentWidth -= Settings.pixelsPerMeter;
+                if (segmentWidth < 1)
+                    segmentWidth = 1;
+
+                float value = segmentWidth / Settings.pixelsPerMeter;
+                try {
+                    String text = str((int) value);
+                    inputFieldSegmentWidth.setText(text);
+                } catch (Exception e) {
+                    inputFieldSegmentWidth.setText(String.valueOf(segmentWidth / Settings.pixelsPerMeter));
+                }
+            }
+        });
 
         float x = calculateButtonX(buttonsTrafficTypes.size() - 2, w, margin);
         inputFieldSegmentWidth = new InputField(x, 0, w, w)
@@ -262,11 +282,29 @@ class Segment extends PComponent {
             }
         });
 
-        textSegmentWidthUnits = new Text(segmentEditorPanel.size.x / 2 - margin - w, 0, "m");
+        buttonSegmentWidthIncrease = new Button(calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w, w,
+                "+");
+        buttonSegmentWidthIncrease.onClick(new Runnable() {
+            @Override
+            public void run() {
+                segmentWidth += Settings.pixelsPerMeter;
+                if (segmentWidth > 99 * Settings.pixelsPerMeter)
+                    segmentWidth = 99 * Settings.pixelsPerMeter;
+
+                float value = segmentWidth / Settings.pixelsPerMeter;
+                try {
+                    String text = str((int) value);
+                    inputFieldSegmentWidth.setText(text);
+                } catch (Exception e) {
+                    inputFieldSegmentWidth.setText(String.valueOf(segmentWidth / Settings.pixelsPerMeter));
+                }
+            }
+        });
 
         segmentEditorPanel.addElementFromTop(textSegmentWidth, false);
+        segmentEditorPanel.addElementFromTop(buttonSegmentWidthDecrease, false);
         segmentEditorPanel.addElementFromTop(inputFieldSegmentWidth, false);
-        segmentEditorPanel.addElementFromTop(textSegmentWidthUnits, false);
+        segmentEditorPanel.addElementFromTop(buttonSegmentWidthIncrease, false);
     }
 
     public void createButtonsSegmentPriority(float w, float margin) {
@@ -1234,10 +1272,12 @@ class Segment extends PComponent {
         delete(textPathColor);
         textSegmentWidth.setActive(false);
         delete(textSegmentWidth);
-        textSegmentWidthUnits.setActive(false);
-        delete(textSegmentWidthUnits);
+        buttonSegmentWidthDecrease.setActive(false);
+        delete(buttonSegmentWidthDecrease);
         inputFieldSegmentWidth.setActive(false);
         delete(inputFieldSegmentWidth);
+        buttonSegmentWidthIncrease.setActive(false);
+        delete(buttonSegmentWidthIncrease);
         textSegmentPriority.setActive(false);
         delete(textSegmentPriority);
         inputFieldSegmentPriority.setActive(false);

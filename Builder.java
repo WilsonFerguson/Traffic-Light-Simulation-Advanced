@@ -708,22 +708,27 @@ class Builder extends PComponent {
         }
     }
 
-    private void branchSegment(Segment hovered) {
+    private void branchSegment(Segment hoveredSegment, Anchor hoveredAnchor) {
         // Get closest two path points and average between them
-        ArrayList<PVector> sortedPath = new ArrayList<>(hovered.path);
+        ArrayList<PVector> sortedPath = new ArrayList<>(hoveredSegment.path);
         sortedPath.sort(Comparator.comparingDouble(
                 p -> PVector.dist(p, cursor.pos)));
         PVector pos = PVector.add(sortedPath.get(0), sortedPath.get(1)).div(2);
 
-        currentAnchor = new Anchor(this, pos.copy());
-        anchors.add(currentAnchor);
+        if (hoveredAnchor == null) {
+            currentAnchor = new Anchor(this, pos.copy());
+            anchors.add(currentAnchor);
+        } else {
+            currentAnchor = hoveredAnchor;
+            pos = currentAnchor.pos;
+        }
 
-        lastSelectedSegment = hovered;
+        lastSelectedSegment = hoveredSegment;
         currentSegment = new Segment(this, pos.copy());
         currentSegment.setStartAnchor(currentAnchor);
 
-        int index0 = hovered.path.indexOf(sortedPath.get(0));
-        int index1 = hovered.path.indexOf(sortedPath.get(1));
+        int index0 = hoveredSegment.path.indexOf(sortedPath.get(0));
+        int index1 = hoveredSegment.path.indexOf(sortedPath.get(1));
         float heading = PVector.sub(sortedPath.get(1), sortedPath.get(0)).heading();
         heading += (index1 < index0) ? PI : 0;
         currentSegment.setHeadings(heading, heading);
@@ -731,11 +736,11 @@ class Builder extends PComponent {
         segments.add(currentSegment);
         segmentPlaced = false;
 
-        currentSegment.setSettings(hovered);
+        currentSegment.setSettings(hoveredSegment);
         currentSegment.updateUIWithValues();
 
-        Segment hoveredNext = splitSegment(hovered, currentAnchor);
-        hovered.addSegmentNext(currentSegment);
+        Segment hoveredNext = splitSegment(hoveredSegment, currentAnchor);
+        hoveredSegment.addSegmentNext(currentSegment);
     }
 
     public void mouseClicked() {
@@ -775,7 +780,7 @@ class Builder extends PComponent {
                 segmentPlaced = true;
                 return;
             } else if (mouseButton == LEFT) {
-                branchSegment(hoveredSegment);
+                branchSegment(hoveredSegment, hoveredAnchor);
             }
         }
     }
