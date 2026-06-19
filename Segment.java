@@ -1293,6 +1293,46 @@ class Segment extends PComponent {
         delete(this);
     }
 
+    public void reverse() {
+        startAnchor.beginSegments.remove(this);
+        startAnchor.endSegments.add(this);
+        endAnchor.beginSegments.add(this);
+        endAnchor.endSegments.remove(this);
+
+        Anchor tempAnchor = startAnchor;
+        startAnchor = endAnchor;
+        endAnchor = tempAnchor;
+
+        PVector tempVector = start;
+        start = end;
+        end = tempVector;
+
+        float tempHeading = startHeading;
+        startHeading = endHeading + PI;
+        endHeading = tempHeading + PI;
+
+        float tempControlPointMag = startControlPointMag;
+        startControlPointMag = endControlPointMag;
+        endControlPointMag = tempControlPointMag;
+
+        updatePath();
+
+        segmentsPrevious.clear();
+        segmentsNext.clear();
+        segmentsNextOptions.clear();
+        for (Segment segment : builder.segments) {
+            segment.segmentsPrevious.remove(this);
+            segment.segmentsNext.remove(this);
+            segment.segmentsNextOptions.remove(this);
+        }
+        for (Segment segment : startAnchor.endSegments) {
+            segment.addSegmentNext(this);
+        }
+        for (Segment segment : endAnchor.beginSegments) {
+            segment.addSegmentPrevious(this);
+        }
+    }
+
     public void setSettings(Segment segment) {
         if (segment == null || segment == this)
             return;

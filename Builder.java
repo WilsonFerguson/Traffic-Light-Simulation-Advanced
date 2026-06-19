@@ -827,6 +827,10 @@ class Builder extends PComponent {
                     }
                 }
             }
+        } else if (key == 'r') {
+            if (currentSegment != null && segmentPlaced) {
+                currentSegment.reverse();
+            }
         } else if (keyString == "Delete") {
             if (currentSegment != null)
                 deleteCurrentSegment();
