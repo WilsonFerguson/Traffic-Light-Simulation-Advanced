@@ -56,6 +56,23 @@ class Anchor extends PComponent {
         }
     }
 
+    public void setPos(PVector pos, HashMap<Segment, Integer> visited) {
+        this.pos = pos;
+        for (Segment segment : beginSegments) {
+            segment.setStartNode(pos);
+        }
+        for (Segment segment : endSegments) {
+            segment.setEndNode(pos);
+        }
+
+        for (Segment segment : beginSegments) {
+            segment.updatePath(visited, true);
+        }
+        for (Segment segment : endSegments) {
+            segment.updatePath(visited, true);
+        }
+    }
+
     public void show() {
         fill(0);
         noStroke();

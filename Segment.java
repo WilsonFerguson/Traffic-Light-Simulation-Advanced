@@ -476,17 +476,21 @@ class Segment extends PComponent {
     }
 
     public void updatePath() {
-        updatePath(new HashSet<Segment>(), true);
+        updatePath(new HashMap<Segment, Integer>(), true);
     }
 
-    private void updatePath(HashSet<Segment> visited, boolean recursive) {
-        if (visited.contains(this))
-            return;
-        visited.add(this);
+    public void updatePath(HashMap<Segment, Integer> visited, boolean recursive) {
+        if (!visited.containsKey(this)) {
+            visited.put(this, 1);
+        } else {
+            if (visited.get(this) > Settings.updatePathMaxRecursion)
+                return;
+            visited.put(this, visited.get(this) + 1);
+        }
 
         if (snappedToSegments.size() > 0 && recursive) {
             for (Segment segment : snappedToSegments) {
-                segment.updateControlledPaths();
+                segment.updateControlledPaths(visited);
             }
         } else if (snappedToSegments.size() == 0) {
             calculatePaths();
@@ -500,7 +504,7 @@ class Segment extends PComponent {
                 segment.updatePath(visited, false);
             }
         }
-        updateControlledPaths();
+        updateControlledPaths(visited);
     }
 
     private void calculatePaths() {
@@ -509,6 +513,9 @@ class Segment extends PComponent {
             case STRAIGHT:
                 float dist = PVector.sub(end, start).mag();
                 int numNodes = ceil(dist / Settings.distanceToNodeThreshold);
+
+                if (numNodes > 10000)
+                    println("Warning! numNodes > 10000 in calculatePaths() Cursor:", builder.cursor.pos);
 
                 if (numNodes == 0) {
                     path.add(start);
@@ -552,32 +559,36 @@ class Segment extends PComponent {
         }
     }
 
-    public void updateControlledPaths() {
+    public void updateControlledPaths(HashMap<Segment, Integer> visited) {
         for (Segment segment : controlledLeftStart) {
-            segment.setStartControlPoint(startHeading, startControlPointMag);
+            segment.setStartControlPoint(startHeading, startControlPointMag, visited);
         }
         for (Segment segment : controlledRightStart) {
-            segment.setStartControlPoint(startHeading, startControlPointMag);
+            segment.setStartControlPoint(startHeading, startControlPointMag, visited);
         }
         for (Segment segment : controlledLeftEnd) {
-            segment.setEndControlPoint(endHeading, endControlPointMag);
+            segment.setEndControlPoint(endHeading, endControlPointMag, visited);
         }
         for (Segment segment : controlledRightEnd) {
-            segment.setEndControlPoint(endHeading, endControlPointMag);
+            segment.setEndControlPoint(endHeading, endControlPointMag, visited);
         }
 
         for (Segment segment : controlledSegments) {
             if (controlledFullLeft.contains(segment) || controlledFullRight.contains(segment))
                 continue;
-            segment.updatePath();
+            segment.updatePath(visited, true);
         }
 
         for (Segment segment : controlledFullLeft) {
-            parallelSegment(segment, -1);
+            parallelSegment(segment, -1, visited);
         }
         for (Segment segment : controlledFullRight) {
-            parallelSegment(segment, 1);
+            parallelSegment(segment, 1, visited);
         }
+    }
+
+    public void updateControlledPaths() {
+        updateControlledPaths(new HashMap<Segment, Integer>());
     }
 
     private PVector bezierPoint(float t, PVector p0, PVector p1, PVector p2, PVector p3) {
@@ -591,10 +602,12 @@ class Segment extends PComponent {
         return PVector.add(PVector.add(first, second), PVector.add(third, fourth));
     }
 
-    private void parallelSegment(Segment segment, int direction) {
+    private void parallelSegment(Segment segment, int direction, HashMap<Segment, Integer> visited) {
         float separation = segmentWidth / 2 + segment.segmentWidth / 2;
 
         segment.path = parallelSegment(separation, direction);
+        segment.setStart(segment.path.get(0), visited);
+        segment.setEnd(segment.path.get(segment.path.size() - 1), visited);
     }
 
     public ArrayList<PVector> parallelSegment(float separation, int direction) {
@@ -649,6 +662,7 @@ class Segment extends PComponent {
 
         updateEditorPanel();
 
+        strokeWeight(3);
     }
 
     private void updateEditorPanel() {
@@ -661,6 +675,8 @@ class Segment extends PComponent {
 
         float margin = segmentEditorPanel.size.x / 10;
         segmentEditorPanel.setPos(margin + segmentEditorPanel.size.x / 2, margin + segmentEditorPanel.size.y / 2);
+
+        colorPickerPathColor.setColorPreviewPosition();
 
         segmentEditorPanel.draw();
     }
@@ -786,7 +802,7 @@ class Segment extends PComponent {
 
     public boolean hovering() {
         // We ignore the first and last points so that it's possible to click anchors
-        for (int i = 1; i < path.size() - 1; i++) {
+        for (int i = 1; i < path.size() - 2; i++) {
             float dist = PVector.dist(path.get(i), mouse);
             if (dist < segmentWidth / 2)
                 return true;
@@ -795,12 +811,24 @@ class Segment extends PComponent {
         return false;
     }
 
-    public void setStart(PVector pos) {
+    private void setStart(PVector pos, HashMap<Segment, Integer> visited) {
         start = pos.copy();
+        if (startAnchor != null)
+            startAnchor.setPos(pos.copy(), visited);
+    }
+
+    private void setEnd(PVector pos, HashMap<Segment, Integer> visited) {
+        end = pos.copy();
+        if (endAnchor != null)
+            endAnchor.setPos(pos.copy(), visited);
+    }
+
+    public void setStart(PVector pos) {
+        setStart(pos, new HashMap<>());
     }
 
     public void setEnd(PVector pos) {
-        end = pos.copy();
+        setEnd(pos, new HashMap<>());
     }
 
     public void setStartAnchor(Anchor anchor) {
@@ -896,6 +924,18 @@ class Segment extends PComponent {
         setEndHeading(heading, true);
         setEndControlPointMag(mag, true);
         updateControlledPaths();
+    }
+
+    public void setStartControlPoint(float heading, float mag, HashMap<Segment, Integer> visited) {
+        setStartHeading(heading, true);
+        setStartControlPointMag(mag, true);
+        updateControlledPaths(visited);
+    }
+
+    public void setEndControlPoint(float heading, float mag, HashMap<Segment, Integer> visited) {
+        setEndHeading(heading, true);
+        setEndControlPointMag(mag, true);
+        updateControlledPaths(visited);
     }
 
     /**
@@ -1016,6 +1056,7 @@ class Segment extends PComponent {
             case MEDIAN:
                 segmentWidth = Settings.segmentWidthPedestrian;
                 segmentColor = Settings.segmentColorPedestrian;
+                setPriority(1);
                 break;
         }
 
@@ -1090,11 +1131,14 @@ class Segment extends PComponent {
                 continue;
             if (endAnchor == segment.startAnchor || startAnchor == segment.endAnchor)
                 continue;
+            if (startAnchor == segment.startAnchor)
+                continue;
 
-            // NOTE: we use found here to not have a segment be added multiple times. I
-            // worry that if it gets added multiple times, when it then gets split when
-            // making a junction, the next intersection (with that same segment) will then
-            // get messed up because now that segments is actually a different segment
+            // NOTE: we use this "found" variable here to not have a segment be added
+            // multiple times. I worry that if it gets added multiple times, when it then
+            // gets split when making a junction, the next intersection (with that same
+            // segment) will then get messed up because now that segments is actually a
+            // different segment
             boolean found = false;
             int startIndex = (includeEndpoints) ? 0 : 1;
             int endIndexMe = (includeEndpoints) ? path.size() - 1 : path.size() - 2;
@@ -1155,6 +1199,96 @@ class Segment extends PComponent {
             if (!colorPickerPathColor.hover())
                 colorPickerPathColor.setActive(false);
         }
+    }
+
+    public void deleteSegment() {
+        segmentEditorPanel.setActive(false);
+        delete(segmentEditorPanel);
+        for (Button button : buttonsTrafficTypes) {
+            button.setActive(false);
+            delete(button);
+        }
+        for (Button button : buttonsSnappingOptions) {
+            button.setActive(false);
+            delete(button);
+        }
+        buttonPathColor.setActive(false);
+        delete(buttonPathColor);
+        colorPickerPathColor.setActive(false);
+        delete(colorPickerPathColor);
+        textPathColor.setActive(false);
+        delete(textPathColor);
+        textSegmentWidth.setActive(false);
+        delete(textSegmentWidth);
+        textSegmentWidthUnits.setActive(false);
+        delete(textSegmentWidthUnits);
+        inputFieldSegmentWidth.setActive(false);
+        delete(inputFieldSegmentWidth);
+        textSegmentPriority.setActive(false);
+        delete(textSegmentPriority);
+        inputFieldSegmentPriority.setActive(false);
+        delete(inputFieldSegmentPriority);
+        buttonSegmentPriorityDecrease.setActive(false);
+        delete(buttonSegmentPriorityDecrease);
+        buttonSegmentPriorityIncrease.setActive(false);
+        delete(buttonSegmentPriorityIncrease);
+        buttonParallel.setActive(false);
+        delete(buttonParallel);
+        buttonParallelDecrease.setActive(false);
+        delete(buttonParallelDecrease);
+        inputFieldParallel.setActive(false);
+        delete(inputFieldParallel);
+        buttonParallelIncrease.setActive(false);
+        delete(buttonParallelIncrease);
+        buttonTypeStraight.setActive(false);
+        delete(buttonTypeStraight);
+        buttonTypeBezier.setActive(false);
+        delete(buttonTypeBezier);
+
+        startAnchor.beginSegments.remove(this);
+        if (startAnchor.beginSegments.size() == 0 && startAnchor.endSegments.size() == 0) {
+            delete(startAnchor);
+            builder.anchors.remove(startAnchor);
+        }
+        endAnchor.endSegments.remove(this);
+        if (endAnchor.beginSegments.size() == 0 && endAnchor.endSegments.size() == 0) {
+            delete(endAnchor);
+            builder.anchors.remove(endAnchor);
+        }
+        for (Segment segment : segmentsPrevious) {
+            segment.segmentsNext.remove(this);
+        }
+        for (Segment segment : segmentsNext) {
+            segment.segmentsPrevious.remove(this);
+        }
+        for (Segment segment : snappedToSegments) {
+            segment.controlledSegments.remove(this);
+            segment.controlledLeftStart.remove(this);
+            segment.controlledRightStart.remove(this);
+            segment.controlledLeftEnd.remove(this);
+            segment.controlledRightEnd.remove(this);
+            segment.controlledFullLeft.remove(this);
+            segment.controlledFullRight.remove(this);
+        }
+        for (Segment segment : controlledSegments) {
+            segment.snappedToSegments.remove(this);
+        }
+
+        builder.segments.remove(this);
+        delete(this);
+    }
+
+    public void setSettings(Segment segment) {
+        if (segment == null || segment == this)
+            return;
+
+        type = segment.type;
+        trafficType = segment.trafficType;
+        segmentWidth = segment.segmentWidth;
+        segmentColor = segment.segmentColor.copy();
+        priority = segment.priority;
+
+        updateUIWithValues();
     }
 
     public Segment copy() {

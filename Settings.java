@@ -73,4 +73,6 @@ class Settings extends PFunctions {
     public static color buttonAccentDefault = new color(70, 219, 75, 150);
     public static color buttonAccentHover = new color(85, 234, 90, 150);
     public static color buttonAccentActive = new color(60, 209, 65, 150);
+
+    public static int updatePathMaxRecursion = 5;
 }

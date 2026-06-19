@@ -10,7 +10,14 @@ class Cursor extends PComponent {
     Segment snappingToSegment;
     PVector snappingLeftRightPoint = null;
     boolean snappingAnchor = false;
+    boolean snappingMiddleSegment = false;
+    /**
+     * Angle only used for showSnapping()
+     */
+    float snappingMiddleSegmentAngle = 0;
+    Segment snappingMiddleSegmentSegment = null;
     boolean snappingWall = false;
+    boolean snappingMiddleScreen = false;
     boolean snapping90 = false;
     boolean snappingHeading = false;
     PVector snappingHeadingPoint = null;
@@ -30,6 +37,10 @@ class Cursor extends PComponent {
     Segment selectedEndControlPoint = null;
     Anchor draggedAnchor = null;
 
+    float epsilon = 0.0001f;
+    float radianMargin = 0.1f;
+    float pixelMargin = 15;
+
     public Cursor(Builder builder) {
         this.builder = builder;
     }
@@ -41,17 +52,30 @@ class Cursor extends PComponent {
             return;
 
         // Absolute snaps (cannot combine with other snapping)
-        if (enabledSnappingOptions[0] && snapLeftAndRightOfSegment(currentSegment, segments))
+        if (enabledSnappingOptions[0] && snapLeftAndRightOfSegment(currentSegment, segments)) {
             return;
-        if (enabledSnappingOptions[1] && snapAnchors(currentSegment, anchors))
+        }
+        if (enabledSnappingOptions[1] && snapAnchors(currentSegment, anchors)) {
             return;
+        }
+        // TODO: Make this togglable
+        if (snapMiddleSegment()) {
+            return;
+        }
 
         // Combination snaps
-        if (enabledSnappingOptions[2])
+        if (enabledSnappingOptions[2]) {
             snapWalls();
+        }
+
+        // TODO: Make this togglable
+        snapMiddleScreen();
+
         snapAngles(currentSegment);
-        if (enabledSnappingOptions[5])
+
+        if (enabledSnappingOptions[5]) {
             snapGuidelines();
+        }
     }
 
     public void show() {
@@ -68,7 +92,11 @@ class Cursor extends PComponent {
         snappingToSegment = null;
         snappingLeftRightPoint = null;
         snappingAnchor = false;
+        snappingMiddleSegment = false;
+        snappingMiddleSegmentAngle = 0;
+        snappingMiddleSegmentSegment = null;
         snappingWall = false;
+        snappingMiddleScreen = false;
         snapping90 = false;
         snappingHeading = false;
         snappingHeadingPoint = null;
@@ -85,6 +113,12 @@ class Cursor extends PComponent {
 
         for (Segment segment : segments) {
             if (segment == currentSegment)
+                continue;
+            if (currentSegment != null && currentSegment.controlledSegments != null
+                    && currentSegment.controlledSegments.contains(segment))
+                continue;
+            if (currentSegment != null && currentSegment.snappedToSegments != null
+                    && currentSegment.snappedToSegments.contains(segment))
                 continue;
 
             PVector node = (currentSegment == null) ? segment.getStartNode() : segment.getEndNode();
@@ -130,8 +164,29 @@ class Cursor extends PComponent {
         return false;
     }
 
+    private boolean snapMiddleSegment() {
+        // if (builder.currentSegment != null && builder.segmentPlaced)
+        // return false;
+        // TODO: (see trello)
+        if (builder.currentSegment != null || builder.currentAnchor != null)
+            return false;
+
+        Segment hovered = builder.getHoveredSegment();
+        if (hovered == null)
+            return false;
+
+        ArrayList<PVector> sortedPath = new ArrayList<>(hovered.path);
+        sortedPath.sort(Comparator.comparingDouble(
+                p -> PVector.dist(p, pos)));
+        pos = PVector.add(sortedPath.get(0), sortedPath.get(1)).div(2);
+
+        snappingMiddleSegment = true;
+        snappingMiddleSegmentAngle = PVector.sub(sortedPath.get(1), sortedPath.get(0)).heading();
+        snappingMiddleSegmentSegment = hovered;
+        return true;
+    }
+
     private boolean snapWalls() {
-        float pixelMargin = 25;
         if (mouseX < pixelMargin) {
             pos.x = 0;
             snappingWall = true;
@@ -154,12 +209,28 @@ class Cursor extends PComponent {
         return snappingWall;
     }
 
+    private boolean snapMiddleScreen() {
+        if (!snappingWall)
+            return false;
+
+        if (abs(mouseX - width / 2) < pixelMargin && !fixedX) {
+            pos.x = width / 2;
+            snappingMiddleScreen = true;
+            fixedX = true;
+        }
+        if (abs(mouseY - height / 2) < pixelMargin && !fixedY) {
+            pos.y = height / 2;
+            snappingMiddleScreen = true;
+            fixedY = true;
+        }
+
+        return snappingMiddleScreen;
+    }
+
     private boolean snapAngles(Segment currentSegment) {
         if (currentSegment == null || (fixedX && fixedY))
             return false;
 
-        float radianMargin = 0.1f;
-        float pixelMargin = 15;
         PVector start = currentSegment.getStartNode();
         if (selectedEndControlPoint != null) {
             start = currentSegment.getEndNode();
@@ -201,8 +272,7 @@ class Cursor extends PComponent {
                         .heading();
 
                 float headingDiff = abs(cursorHeading - endHeading);
-                // TODO: check every % PI and see if it's actually needed (probably isn't)
-                if (abs(headingDiff) % PI < radianMargin) {
+                if (abs(headingDiff) < radianMargin) {
                     if (!fixedX && !fixedY) {
                         float dist = PVector.dist(currentSegment.getStartNode(), pos);
                         pos = PVector.fromAngle(endHeading).setMag(dist)
@@ -212,9 +282,13 @@ class Cursor extends PComponent {
                         return true;
                     } else {
                         if (fixedX) {
+                            if (abs(tan(endHeading)) > 10000)
+                                return false;
                             pos.y = start.y + (pos.x - start.x) * tan(endHeading);
                             fixedY = true;
                         } else {
+                            if (abs(tan(endHeading)) < epsilon)
+                                return false;
                             pos.x = start.x + (pos.y - start.y) / tan(endHeading);
                             fixedX = true;
                         }
@@ -234,7 +308,7 @@ class Cursor extends PComponent {
                 float endHeading = PVector.sub(next.getNode(0), next.getNode(1)).heading();
 
                 float headingDiff = abs(cursorHeading - endHeading);
-                if (abs(headingDiff) % PI < radianMargin) {
+                if (abs(headingDiff) < radianMargin) {
                     if (!fixedX && !fixedY) {
                         float dist = PVector.dist(currentSegment.getEndNode(), pos);
                         pos = PVector.fromAngle(endHeading).setMag(dist)
@@ -244,9 +318,13 @@ class Cursor extends PComponent {
                         return true;
                     } else {
                         if (fixedX) {
+                            if (abs(tan(endHeading)) > 10000)
+                                return false;
                             pos.y = start.y + (pos.x - start.x) * tan(endHeading);
                             fixedY = true;
                         } else {
+                            if (abs(tan(endHeading)) < epsilon)
+                                return false;
                             pos.x = start.x + (pos.y - start.y) / tan(endHeading);
                             fixedX = true;
                         }
@@ -270,7 +348,7 @@ class Cursor extends PComponent {
                     .heading();
 
             float headingDiff = abs(cursorHeading - endHeading);
-            if (abs(headingDiff) % PI < radianMargin) {
+            if (abs(headingDiff) < radianMargin) {
                 if (!fixedX && !fixedY) {
                     float dist = PVector.dist(currentSegment.getStartNode(), pos);
                     pos = PVector.fromAngle(endHeading).setMag(dist)
@@ -281,9 +359,13 @@ class Cursor extends PComponent {
                 } else {
                     // Calculate what the other fixed axis should be
                     if (fixedX) {
+                        if (abs(tan(endHeading)) > 10000)
+                            return false;
                         pos.y = start.y + (pos.x - start.x) * tan(endHeading);
                         fixedY = true;
                     } else {
+                        if (abs(tan(endHeading)) < epsilon)
+                            return false;
                         pos.x = start.x + (pos.y - start.y) / tan(endHeading);
                         fixedX = true;
                     }
@@ -300,9 +382,6 @@ class Cursor extends PComponent {
     private boolean snapGuidelines() {
         if ((fixedX && fixedY))
             return false;
-
-        float radianMargin = 0.1f;
-        float pixelMargin = 15;
 
         float bestDistance = Float.MAX_VALUE;
         PVector bestNode = null;
@@ -356,9 +435,13 @@ class Cursor extends PComponent {
                     snappingGuidelinesPoint = node;
                 } else {
                     if (fixedX) {
+                        if (abs(tan(targetHeading)) > 10000)
+                            return Float.MAX_VALUE;
                         pos.y = node.y + (pos.x - node.x) * tan(targetHeading);
                         fixedY = true;
                     } else {
+                        if (abs(tan(targetHeading)) < epsilon)
+                            return Float.MAX_VALUE;
                         pos.x = node.x + (pos.y - node.y) / tan(targetHeading);
                         fixedX = true;
                     }
@@ -408,11 +491,35 @@ class Cursor extends PComponent {
         if (snappingAnchor) {
             circle(pos, Settings.sizeAnchor);
         }
+        // Middle segment snapping
+        if (snappingMiddleSegment) {
+            float perpendicularMag = snappingMiddleSegmentSegment.segmentWidth / 3;
+            float offset = Settings.sizeAnchor / 2 + mag / 4;
+
+            PVector tangent = PVector.fromAngle(snappingMiddleSegmentAngle);
+            PVector perpendicular = PVector.fromAngle(snappingMiddleSegmentAngle + PI / 2);
+
+            PVector start = PVector.add(pos, tangent.setMag(offset));
+            line(start, PVector.add(start, tangent.setMag(perpendicularMag)));
+            line(PVector.add(start, perpendicular.setMag(perpendicularMag)),
+                    PVector.sub(start, perpendicular.setMag(perpendicularMag)));
+            start = PVector.sub(pos, tangent.setMag(offset));
+            line(start, PVector.sub(start, tangent.setMag(perpendicularMag)));
+            line(PVector.sub(start, perpendicular.setMag(perpendicularMag)),
+                    PVector.add(start, perpendicular.setMag(perpendicularMag)));
+        }
         // Wall snapping
         if (snappingWall) {
             if (pos.x == 0 || pos.x == width)
                 line(pos.x, pos.y - mag, pos.x, pos.y + mag);
             if (pos.y == 0 || pos.y == height)
+                line(pos.x - mag, pos.y, pos.x + mag, pos.y);
+        }
+        // Middle snapping
+        if (snappingMiddleScreen) {
+            if (pos.x == width / 2)
+                line(pos.x, pos.y - mag, pos.x, pos.y + mag);
+            if (pos.y == height / 2)
                 line(pos.x - mag, pos.y, pos.x + mag, pos.y);
         }
         // Angle snapping

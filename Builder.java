@@ -11,6 +11,7 @@ class Builder extends PComponent {
 
     Anchor currentAnchor;
     Segment currentSegment;
+    Segment lastSelectedSegment;
     boolean segmentPlaced;
 
     int parallelNumSegments = 2;
@@ -24,6 +25,7 @@ class Builder extends PComponent {
 
         currentAnchor = null;
         currentSegment = null;
+        lastSelectedSegment = null;
         segmentPlaced = false;
 
         cursor = new Cursor(this);
@@ -54,9 +56,11 @@ class Builder extends PComponent {
             }
         } else {
         }
+
     }
 
     public void show() {
+        segments.sort(Comparator.comparingInt(o -> o.priority));
         for (Segment segment : segments) {
             if (segment == currentSegment)
                 continue;
@@ -115,6 +119,8 @@ class Builder extends PComponent {
         currentSegment.setStartAnchor(currentAnchor);
         segments.add(currentSegment);
         segmentPlaced = false;
+
+        currentSegment.setSettings(lastSelectedSegment);
     }
 
     public void newSegment(PVector pos, float heading) {
@@ -123,6 +129,8 @@ class Builder extends PComponent {
         currentSegment.setStartHeading(heading, true);
         segments.add(currentSegment);
         segmentPlaced = false;
+
+        currentSegment.setSettings(lastSelectedSegment);
     }
 
     /**
@@ -216,6 +224,8 @@ class Builder extends PComponent {
         if (currentSegment == null)
             return;
 
+        lastSelectedSegment = currentSegment;
+
         if (segmentPlaced) {
             currentSegment = null;
             segmentPlaced = false;
@@ -260,6 +270,63 @@ class Builder extends PComponent {
         removeUnusedAnchors();
     }
 
+    public void deleteCurrentSegment() {
+        currentSegment.deleteSegment();
+    }
+
+    public boolean deleteAnchor(Anchor anchor) {
+        if (anchor.beginSegments.size() == 1 && anchor.endSegments.size() == 1) {
+            // TODO: pair up the segments
+            Segment incoming = anchor.endSegments.iterator().next();
+            Segment outgoing = anchor.beginSegments.iterator().next();
+
+            incoming.setEndAnchor(outgoing.endAnchor);
+            incoming.setEnd(outgoing.end);
+            for (Segment segment : outgoing.segmentsNext) {
+                incoming.addSegmentNext(segment);
+            }
+            for (Segment segment : outgoing.snappedToSegments) {
+                incoming.snappedToSegments.add(segment);
+            }
+            for (Segment segment : segments) {
+                if (segment.controlledSegments.contains(outgoing))
+                    incoming.controlledSegments.add(segment);
+                if (segment.controlledLeftStart.contains(outgoing))
+                    incoming.controlledLeftStart.add(segment);
+                if (segment.controlledRightStart.contains(outgoing))
+                    incoming.controlledRightStart.add(segment);
+                if (segment.controlledLeftEnd.contains(outgoing))
+                    incoming.controlledLeftEnd.add(segment);
+                if (segment.controlledRightEnd.contains(outgoing))
+                    incoming.controlledRightEnd.add(segment);
+                if (segment.controlledFullLeft.contains(outgoing))
+                    incoming.controlledFullLeft.add(segment);
+                if (segment.controlledFullRight.contains(outgoing))
+                    incoming.controlledFullRight.add(segment);
+            }
+
+            incoming.setEndControlPoint(outgoing.endHeading, outgoing.endControlPointMag);
+            incoming.setClosingSegment(outgoing.closingSegment);
+
+            incoming.updatePath();
+            incoming.updateUIWithValues();
+
+            delete(outgoing);
+            segments.remove(outgoing);
+
+            delete(anchor);
+            anchors.remove(anchor);
+            return true;
+        }
+        if (anchor.beginSegments.size() == 0 && anchor.endSegments.size() == 0) {
+            delete(anchor);
+            anchors.remove(anchor);
+            return true;
+        }
+
+        return false;
+    }
+
     private void removeUnusedAnchors() {
         for (int i = anchors.size() - 1; i >= 0; i--) {
             Anchor anchor = anchors.get(i);
@@ -299,9 +366,7 @@ class Builder extends PComponent {
             for (Segment previous : previousSegments) {
                 currentSegment.addSegmentPrevious(previous);
             }
-            currentSegment.setType(previousFirst.type);
-            currentSegment.setTrafficType(previousFirst.trafficType);
-            currentSegment.setPriority(previousFirst.priority);
+            currentSegment.setSettings(previousFirst);
             if (previousFirst.endHeading != -Float.MIN_VALUE)
                 currentSegment.setStartHeading(previousFirst.endHeading, true);
 
@@ -432,10 +497,7 @@ class Builder extends PComponent {
             segment.setStartAnchor(startAnchor);
         }
 
-        segment.setType(baseSegment.type);
-        segment.setTrafficType(baseSegment.trafficType);
-        segment.setPriority(baseSegment.priority);
-        segment.setSegmentColor(baseSegment.segmentColor);
+        segment.setSettings(baseSegment);
         segment.setOpeningSegment(baseSegment.openingSegment);
         segment.setClosingSegment(baseSegment.closingSegment);
 
@@ -469,7 +531,9 @@ class Builder extends PComponent {
             segment.setEndAnchor(endAnchor);
         }
 
-        ArrayList<Object[]> data = segment.getCrossedSegments(segments, true);
+        // TODO: this use to be ", true" but I changed to false to fix a bug. Why was it
+        // true? I know there was intent behind it
+        ArrayList<Object[]> data = segment.getCrossedSegments(segments, false);
         // NOTE: we only choose the last one here because for now we are not making any
         // intermediate 4 way junctions
         if (data.size() > 0) {
@@ -531,9 +595,7 @@ class Builder extends PComponent {
             cursor.snappingToSegment.controlRightStart(currentSegment);
 
         currentSegment.addSegmentPrevious(previous);
-        currentSegment.setType(previous.type);
-        currentSegment.setTrafficType(previous.trafficType);
-        currentSegment.setPriority(previous.priority);
+        currentSegment.setSettings(previous);
         if (previous.endHeading != -Float.MIN_VALUE)
             currentSegment.setStartHeading(previous.endHeading, true);
 
@@ -555,6 +617,8 @@ class Builder extends PComponent {
                 for (Object[] d : data) {
                     Segment crossed = (Segment) d[0];
                     PVector intersection = (PVector) d[1];
+                    if (intersection == null)
+                        continue;
                     Segment nextBase = make4WayJunction(crossed, comingIn, intersection);
                     bases.add(nextBase);
                 }
@@ -596,15 +660,43 @@ class Builder extends PComponent {
         for (Segment segment : currentAnchor.endSegments) {
             currentSegment.addSegmentPrevious(segment);
         }
-        currentSegment.setType(previous.type);
-        currentSegment.setTrafficType(previous.trafficType);
-        currentSegment.setPriority(previous.priority);
+        currentSegment.setSettings(previous);
         if (previous.endHeading != -Float.MIN_VALUE)
             currentSegment.setStartHeading(previous.endHeading, true);
 
         if (parallelMode && (parallelNumSegments < -1 || parallelNumSegments > 1)) {
             makeParallelSegments(comingIn);
         }
+    }
+
+    private void branchSegment(Segment hovered) {
+        // Get closest two path points and average between them
+        ArrayList<PVector> sortedPath = new ArrayList<>(hovered.path);
+        sortedPath.sort(Comparator.comparingDouble(
+                p -> PVector.dist(p, cursor.pos)));
+        PVector pos = PVector.add(sortedPath.get(0), sortedPath.get(1)).div(2);
+
+        currentAnchor = new Anchor(this, pos.copy());
+        anchors.add(currentAnchor);
+
+        lastSelectedSegment = hovered;
+        currentSegment = new Segment(this, pos.copy());
+        currentSegment.setStartAnchor(currentAnchor);
+
+        int index0 = hovered.path.indexOf(sortedPath.get(0));
+        int index1 = hovered.path.indexOf(sortedPath.get(1));
+        float heading = PVector.sub(sortedPath.get(1), sortedPath.get(0)).heading();
+        heading += (index1 < index0) ? PI : 0;
+        currentSegment.setHeadings(heading, heading);
+
+        segments.add(currentSegment);
+        segmentPlaced = false;
+
+        currentSegment.setSettings(hovered);
+        currentSegment.updateUIWithValues();
+
+        Segment hoveredNext = splitSegment(hovered, currentAnchor);
+        hovered.addSegmentNext(currentSegment);
     }
 
     public void mouseClicked() {
@@ -618,19 +710,17 @@ class Builder extends PComponent {
                 deselectAnchor();
             return;
         }
-        if (mouseButton != LEFT)
-            return;
 
         // Make brand new segment that starts a path
         Anchor hoveredAnchor = getHoveredAnchor();
         Segment hoveredSegment = getHoveredSegment();
-        if (currentAnchor == null && currentSegment == null && hoveredSegment == null) {
+        if (currentAnchor == null && currentSegment == null && hoveredSegment == null && mouseButton == LEFT) {
             createBrandNewSegment(hoveredAnchor, hoveredSegment);
             return;
         }
 
         // Make new segment that continues path
-        if (currentSegment != null && !segmentPlaced && !hoveringSegmentInfo()) {
+        if (currentSegment != null && !segmentPlaced && !hoveringSegmentInfo() && mouseButton == LEFT) {
             if (hoveredAnchor == null)
                 completeCurrentSegmentFree();
             else
@@ -638,11 +728,16 @@ class Builder extends PComponent {
         }
 
         if (hoveredSegment != null && (currentSegment == null || segmentPlaced)) {
-            if (currentSegment != null)
-                deselectSegment();
-            selectSegment(hoveredSegment);
-            segmentPlaced = true;
-            return;
+            // 2 = middle
+            if (mouseButton == 2) {
+                if (currentSegment != null)
+                    deselectSegment();
+                selectSegment(hoveredSegment);
+                segmentPlaced = true;
+                return;
+            } else if (mouseButton == LEFT) {
+                branchSegment(hoveredSegment);
+            }
         }
     }
 
@@ -651,6 +746,14 @@ class Builder extends PComponent {
             return;
         if (cursor.draggedAnchor != null) {
             cursor.draggedAnchor.setPos(cursor.pos);
+            if (cursor.snappingWall) {
+                if (cursor.draggedAnchor.beginSegments.size() == 0 && cursor.draggedAnchor.endSegments.size() != 0) {
+                    cursor.draggedAnchor.setClosingAnchor(true);
+                } else if (cursor.draggedAnchor.beginSegments.size() != 0
+                        && cursor.draggedAnchor.endSegments.size() == 0) {
+                    cursor.draggedAnchor.setOpeningAnchor(true);
+                }
+            }
         }
     }
 
@@ -673,6 +776,12 @@ class Builder extends PComponent {
                 currentSegment.updateUIWithValues();
                 currentSegment.updatePath();
             }
+        } else if (keyString == "Delete") {
+            if (currentSegment != null)
+                deleteCurrentSegment();
+            Anchor hovered = getHoveredAnchor();
+            if (hovered != null)
+                deleteAnchor(hovered);
         }
     }
 }
