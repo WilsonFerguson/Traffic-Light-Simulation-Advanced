@@ -31,6 +31,7 @@ class Segment extends PComponent {
 
     HashSet<Segment> segmentsPrevious = new HashSet<>();
     HashSet<Segment> segmentsNext = new HashSet<>();
+    HashSet<Segment> segmentsNextOptions = new HashSet<>();
 
     /**
      * List of segments that we are snapped to.
@@ -651,6 +652,8 @@ class Segment extends PComponent {
     public void showSelected() {
         // drawMarkings();
 
+        drawNextOptions();
+
         fill(segmentColor);
         stroke(255);
         strokeWeight(3);
@@ -663,6 +666,15 @@ class Segment extends PComponent {
         updateEditorPanel();
 
         strokeWeight(3);
+    }
+
+    private void drawNextOptions() {
+        // fill(color(Settings.lightRed, 80));
+        fill(Settings.lightYellow, 160);
+        noStroke();
+        for (Segment segment : segmentsNextOptions) {
+            segment.drawPath(segment.path);
+        }
     }
 
     private void updateEditorPanel() {
@@ -851,7 +863,7 @@ class Segment extends PComponent {
 
     public void setStartHeading(float heading, boolean recursive) {
         startHeading = heading;
-        if (recursive) {
+        if (recursive && segmentsPrevious.size() == 1) {
             for (Segment segment : segmentsPrevious) {
                 segment.setEndHeading(heading, false);
             }
@@ -866,7 +878,7 @@ class Segment extends PComponent {
 
     public void setEndHeading(float heading, boolean recursive) {
         endHeading = heading;
-        if (recursive) {
+        if (recursive && segmentsNext.size() == 1) {
             for (Segment segment : segmentsNext) {
                 segment.setStartHeading(heading, false);
             }
@@ -958,10 +970,12 @@ class Segment extends PComponent {
     public void addSegmentPrevious(Segment segment) {
         segmentsPrevious.add(segment);
         segment.segmentsNext.add(this);
+        segment.segmentsNextOptions.add(this);
     }
 
     public void addSegmentNext(Segment segment) {
         segmentsNext.add(segment);
+        segmentsNextOptions.add(segment);
         segment.segmentsPrevious.add(this);
     }
 
@@ -1257,6 +1271,7 @@ class Segment extends PComponent {
         }
         for (Segment segment : segmentsPrevious) {
             segment.segmentsNext.remove(this);
+            segment.segmentsNextOptions.remove(this);
         }
         for (Segment segment : segmentsNext) {
             segment.segmentsPrevious.remove(this);
@@ -1302,9 +1317,14 @@ class Segment extends PComponent {
 
         for (Segment segment : segmentsPrevious) {
             copy.segmentsPrevious.add(segment);
+            if (segment.segmentsNextOptions.contains(this))
+                segment.segmentsNextOptions.add(copy);
         }
         for (Segment segment : segmentsNext) {
             copy.segmentsNext.add(segment);
+        }
+        for (Segment segment : segmentsNextOptions) {
+            copy.segmentsNextOptions.add(segment);
         }
         for (Segment segment : snappedToSegments) {
             copy.snappedToSegments.add(segment);

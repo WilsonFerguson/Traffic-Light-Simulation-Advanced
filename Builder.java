@@ -255,6 +255,7 @@ class Builder extends PComponent {
         }
         for (Segment segment : currentSegment.segmentsPrevious) {
             segment.segmentsNext.remove(currentSegment);
+            segment.segmentsNextOptions.remove(currentSegment);
         }
 
         if (currentSegment.startAnchor != null)
@@ -411,9 +412,12 @@ class Builder extends PComponent {
         for (Segment segment : original.segmentsNext)
             segment.segmentsPrevious.remove(original);
         original.segmentsNext.clear();
+        original.segmentsNextOptions.clear();
 
-        for (Segment segment : next.segmentsPrevious)
+        for (Segment segment : next.segmentsPrevious) {
             segment.segmentsNext.remove(next);
+            segment.segmentsNextOptions.remove(next);
+        }
         next.segmentsPrevious.clear();
         for (Segment segment : next.segmentsNext) {
             segment.segmentsPrevious.add(next);
@@ -537,6 +541,9 @@ class Builder extends PComponent {
         // NOTE: we only choose the last one here because for now we are not making any
         // intermediate 4 way junctions
         if (data.size() > 0) {
+            if (data.getLast()[1] == null)
+                throw new RuntimeException("Anchor position is null when making this t-junction");
+
             Anchor junctionAnchor = new Anchor(this, (PVector) data.getLast()[1]);
             anchors.add(junctionAnchor);
             makeTJunction((Segment) data.getLast()[0], segment, junctionAnchor);
@@ -565,14 +572,28 @@ class Builder extends PComponent {
     private Segment make4WayJunction(Segment crossed, Segment comingIn, PVector intersection) {
         Anchor anchor = new Anchor(this, intersection);
         anchors.add(anchor);
+        return make4WayJunction(crossed, comingIn, anchor);
+    }
 
+    private Segment make4WayJunction(Segment crossed, Segment comingIn, Anchor anchor) {
         Segment crossedNext = splitSegment(crossed, anchor);
         Segment comingInNext = splitSegment(comingIn, anchor);
 
         comingIn.addSegmentNext(crossedNext);
         crossed.addSegmentNext(comingInNext);
 
+        limitHeadings(comingIn, comingIn.start.dist(comingIn.end));
+        limitHeadings(comingInNext, comingInNext.start.dist(comingInNext.end));
+        limitHeadings(crossed, crossed.start.dist(crossed.end));
+        limitHeadings(crossedNext, crossedNext.start.dist(crossedNext.end));
+
         return comingInNext;
+    }
+
+    private void limitHeadings(Segment segment, float mag) {
+        segment.startControlPointMag = min(mag, segment.startControlPointMag);
+        segment.endControlPointMag = min(mag, segment.endControlPointMag);
+        segment.updatePath();
     }
 
     /**
@@ -615,12 +636,30 @@ class Builder extends PComponent {
             ArrayList<Object[]> data = comingIn.getCrossedSegments(segments, false);
             if (data.size() > 0) {
                 for (Object[] d : data) {
+                    if (d[1] == null)
+                        throw new RuntimeException("Anchor position is null when making this t-junction");
+
                     Segment crossed = (Segment) d[0];
                     PVector intersection = (PVector) d[1];
                     if (intersection == null)
                         continue;
-                    Segment nextBase = make4WayJunction(crossed, comingIn, intersection);
-                    bases.add(nextBase);
+
+                    // Snap to closer anchor if possible
+                    Anchor junctionAnchor = null;
+                    for (Anchor anchor : anchors) {
+                        if (anchor.pos.dist(intersection) < comingIn.segmentWidth * 1.3f) {
+                            junctionAnchor = anchor;
+                            break;
+                        }
+                    }
+
+                    if (junctionAnchor != null) {
+                        Segment nextBase = make4WayJunction(crossed, comingIn, junctionAnchor);
+                        bases.add(nextBase);
+                    } else {
+                        Segment nextBase = make4WayJunction(crossed, comingIn, intersection);
+                        bases.add(nextBase);
+                    }
                 }
             }
 
@@ -775,6 +814,18 @@ class Builder extends PComponent {
                 }
                 currentSegment.updateUIWithValues();
                 currentSegment.updatePath();
+            }
+        } else if (key == 's') {
+            if (currentSegment != null && segmentPlaced) {
+                Segment hovered = getHoveredSegment();
+                if (hovered != null) {
+                    if (currentSegment.segmentsNext.contains(hovered)) {
+                        if (currentSegment.segmentsNextOptions.contains(hovered))
+                            currentSegment.segmentsNextOptions.remove(hovered);
+                        else
+                            currentSegment.segmentsNextOptions.add(hovered);
+                    }
+                }
             }
         } else if (keyString == "Delete") {
             if (currentSegment != null)

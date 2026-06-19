@@ -364,9 +364,14 @@ class RoadUser extends PComponent {
     }
 
     private ArrayList<Segment> findCandidates() {
-        HashSet<Segment> options = currentSegment.segmentsNext;
-        if (segmentReverse)
-            options = currentSegment.segmentsPrevious;
+        HashSet<Segment> options = currentSegment.segmentsNextOptions;
+        if (segmentReverse) {
+            // options = currentSegment.segmentsPrevious;
+            for (Segment segment : currentSegment.segmentsPrevious) {
+                if (segment.segmentsNextOptions.contains(currentSegment))
+                    options.add(segment);
+            }
+        }
         ArrayList<Segment> candidates = new ArrayList<Segment>();
 
         // Initial candidates
