@@ -17,6 +17,8 @@ class Builder extends PComponent {
     int parallelNumSegments = 2;
     boolean parallelMode = false;
 
+    boolean makeIntermediateAnchors = false;
+
     public Builder(Sketch sketch) {
         anchors = new ArrayList<Anchor>();
         segments = new ArrayList<Segment>();
@@ -633,32 +635,35 @@ class Builder extends PComponent {
             bases.add(comingIn);
             // If we crossed a pre-existing segment, then we need to make a 4-way junction
             // Segment crossed = comingIn.getCrossedSegment(segments);
-            ArrayList<Object[]> data = comingIn.getCrossedSegments(segments, false);
-            if (data.size() > 0) {
-                for (Object[] d : data) {
-                    if (d[1] == null)
-                        throw new RuntimeException("Anchor position is null when making this t-junction");
+            if (makeIntermediateAnchors) {
+                ArrayList<Object[]> data = comingIn.getCrossedSegments(segments, false);
+                if (data.size() > 0) {
+                    for (Object[] d : data) {
+                        if (d[1] == null)
+                            throw new RuntimeException("Anchor position is null when making this t-junction");
 
-                    Segment crossed = (Segment) d[0];
-                    PVector intersection = (PVector) d[1];
-                    if (intersection == null)
-                        continue;
+                        Segment crossed = (Segment) d[0];
+                        PVector intersection = (PVector) d[1];
+                        if (intersection == null)
+                            continue;
 
-                    // Snap to closer anchor if possible
-                    Anchor junctionAnchor = null;
-                    for (Anchor anchor : anchors) {
-                        if (anchor.pos.dist(intersection) < comingIn.segmentWidth * 1.3f) {
-                            junctionAnchor = anchor;
-                            break;
+                        // Snap to closer anchor if possible
+                        Anchor junctionAnchor = null;
+                        float distanceThreshold = 3f * Settings.pixelsPerMeter;
+                        for (Anchor anchor : anchors) {
+                            if (anchor.pos.dist(intersection) < distanceThreshold) {
+                                junctionAnchor = anchor;
+                                break;
+                            }
                         }
-                    }
 
-                    if (junctionAnchor != null) {
-                        Segment nextBase = make4WayJunction(crossed, comingIn, junctionAnchor);
-                        bases.add(nextBase);
-                    } else {
-                        Segment nextBase = make4WayJunction(crossed, comingIn, intersection);
-                        bases.add(nextBase);
+                        if (junctionAnchor != null) {
+                            Segment nextBase = make4WayJunction(crossed, comingIn, junctionAnchor);
+                            bases.add(nextBase);
+                        } else {
+                            Segment nextBase = make4WayJunction(crossed, comingIn, intersection);
+                            bases.add(nextBase);
+                        }
                     }
                 }
             }
@@ -731,7 +736,7 @@ class Builder extends PComponent {
         int index1 = hoveredSegment.path.indexOf(sortedPath.get(1));
         float heading = PVector.sub(sortedPath.get(1), sortedPath.get(0)).heading();
         heading += (index1 < index0) ? PI : 0;
-        currentSegment.setHeadings(heading, heading);
+        currentSegment.startHeading = heading;
 
         segments.add(currentSegment);
         segmentPlaced = false;
@@ -832,10 +837,15 @@ class Builder extends PComponent {
                     }
                 }
             }
+        } else if (key == 'S') {
+            if (currentSegment != null && segmentPlaced)
+                currentSegment.segmentsNextOptions.clear();
         } else if (key == 'r') {
             if (currentSegment != null && segmentPlaced) {
                 currentSegment.reverse();
             }
+        } else if (key == 'i') {
+            makeIntermediateAnchors = !makeIntermediateAnchors;
         } else if (keyString == "Delete") {
             if (currentSegment != null)
                 deleteCurrentSegment();

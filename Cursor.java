@@ -510,10 +510,22 @@ class Cursor extends PComponent {
         }
         // Wall snapping
         if (snappingWall) {
-            if (pos.x == 0 || pos.x == width)
+            float wallMag = 0;
+            if (builder.lastSelectedSegment != null)
+                wallMag = builder.lastSelectedSegment.segmentWidth / 2;
+
+            if (pos.x == 0 || pos.x == width) {
                 line(pos.x, pos.y - mag, pos.x, pos.y + mag);
-            if (pos.y == 0 || pos.y == height)
+                stroke(Settings.lightYellow);
+                line(pos.x, pos.y - wallMag, pos.x, pos.y + wallMag);
+                stroke(255);
+            }
+            if (pos.y == 0 || pos.y == height) {
                 line(pos.x - mag, pos.y, pos.x + mag, pos.y);
+                stroke(Settings.lightYellow);
+                line(pos.x - wallMag, pos.y, pos.x + wallMag, pos.y);
+                stroke(255);
+            }
         }
         // Middle snapping
         if (snappingMiddleScreen) {

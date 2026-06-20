@@ -105,8 +105,11 @@ class RoadUser extends PComponent {
     private void move() {
         // Target speed will be based on how far off the heading we are
         PVector targetNode = getOffsetNode(targetSegmentIndex);
-        float targetHeading = PVector.sub(targetNode, pos).heading();
-        float targetHeadingDeviation = abs(targetHeading - heading);
+        PVector toTarget = PVector.sub(targetNode, pos);
+        float targetHeading = toTarget.heading();
+        float targetHeadingDeviation = atan2(
+                sin(targetHeading - heading),
+                cos(targetHeading - heading));
         float targetSpeed = map(targetHeadingDeviation, 0, PI / 2.5, maxSpeed, 0);
 
         // Accelerate as if there is no reason to stop
@@ -129,7 +132,7 @@ class RoadUser extends PComponent {
         else if (speed < 0)
             speed = 0;
 
-        heading = lerp(heading, targetHeading, Settings.turningRate);
+        heading += targetHeadingDeviation * Settings.turningRate;
         pos.add(PVector.fromAngle(heading).setMag(speed * dt));
     }
 
