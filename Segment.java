@@ -699,6 +699,7 @@ class Segment extends PComponent {
 
         noStroke();
         // drawPathPoints();
+        drawDirectionArrow();
         drawControlPoints();
 
         updateEditorPanel();
@@ -713,6 +714,19 @@ class Segment extends PComponent {
         for (Segment segment : segmentsNextOptions) {
             segment.drawPath(segment.path);
         }
+    }
+
+    private void drawDirectionArrow() {
+        int index = path.size() / 2;
+        PVector node = path.get(index);
+        int indexLater = (index < path.size() - 1) ? index + 1 : index;
+        int indexPrevious = (index > 0) ? index - 1 : index;
+        float heading = PVector.sub(path.get(indexLater), path.get(indexPrevious)).heading() + PI;
+
+        stroke(255);
+        strokeWeight(3);
+        line(node, PVector.fromAngle(heading + PI / 4).setMag(segmentWidth / 2).add(node));
+        line(node, PVector.fromAngle(heading - PI / 4).setMag(segmentWidth / 2).add(node));
     }
 
     private void updateEditorPanel() {
@@ -1017,61 +1031,61 @@ class Segment extends PComponent {
         segment.segmentsPrevious.add(this);
     }
 
-    public void controlLeftStart(Segment segment) {
-        controlledLeftStart.add(segment);
-        controlledSegments.add(segment);
-        if (controlledLeftEnd.contains(segment)) {
-            controlledFullLeft.add(segment);
-            segment.snappedToSegments.add(this);
-        }
-
-        if (openingSegment)
-            segment.openingSegment = true;
-
-        updateControlledPaths();
-    }
-
-    public void controlRightStart(Segment segment) {
-        controlledRightStart.add(segment);
-        controlledSegments.add(segment);
-        if (controlledRightEnd.contains(segment)) {
-            controlledFullRight.add(segment);
-            segment.snappedToSegments.add(this);
-        }
-
-        if (openingSegment)
-            segment.openingSegment = true;
-
-        updateControlledPaths();
-    }
-
-    public void controlLeftEnd(Segment segment) {
-        controlledLeftEnd.add(segment);
-        controlledSegments.add(segment);
-        if (controlledLeftEnd.contains(segment)) {
-            controlledFullLeft.add(segment);
-            segment.snappedToSegments.add(this);
-        }
-
-        if (closingSegment)
-            segment.closingSegment = true;
-
-        updateControlledPaths();
-    }
-
-    public void controlRightEnd(Segment segment) {
-        controlledRightEnd.add(segment);
-        controlledSegments.add(segment);
-        if (controlledRightEnd.contains(segment)) {
-            controlledFullRight.add(segment);
-            segment.snappedToSegments.add(this);
-        }
-
-        if (closingSegment)
-            segment.closingSegment = true;
-
-        updateControlledPaths();
-    }
+    // public void controlLeftStart(Segment segment) {
+    // controlledLeftStart.add(segment);
+    // controlledSegments.add(segment);
+    // if (controlledLeftEnd.contains(segment)) {
+    // controlledFullLeft.add(segment);
+    // segment.snappedToSegments.add(this);
+    // }
+    //
+    // if (openingSegment)
+    // segment.openingSegment = true;
+    //
+    // updateControlledPaths();
+    // }
+    //
+    // public void controlRightStart(Segment segment) {
+    // controlledRightStart.add(segment);
+    // controlledSegments.add(segment);
+    // if (controlledRightEnd.contains(segment)) {
+    // controlledFullRight.add(segment);
+    // segment.snappedToSegments.add(this);
+    // }
+    //
+    // if (openingSegment)
+    // segment.openingSegment = true;
+    //
+    // updateControlledPaths();
+    // }
+    //
+    // public void controlLeftEnd(Segment segment) {
+    // controlledLeftEnd.add(segment);
+    // controlledSegments.add(segment);
+    // if (controlledLeftEnd.contains(segment)) {
+    // controlledFullLeft.add(segment);
+    // segment.snappedToSegments.add(this);
+    // }
+    //
+    // if (closingSegment)
+    // segment.closingSegment = true;
+    //
+    // updateControlledPaths();
+    // }
+    //
+    // public void controlRightEnd(Segment segment) {
+    // controlledRightEnd.add(segment);
+    // controlledSegments.add(segment);
+    // if (controlledRightEnd.contains(segment)) {
+    // controlledFullRight.add(segment);
+    // segment.snappedToSegments.add(this);
+    // }
+    //
+    // if (closingSegment)
+    // segment.closingSegment = true;
+    //
+    // updateControlledPaths();
+    // }
 
     public void setType(SegmentType type) {
         this.type = type;
@@ -1174,7 +1188,7 @@ class Segment extends PComponent {
 
     public ArrayList<Object[]> getCrossedSegments(ArrayList<Segment> segments, boolean includeEndpoints) {
         ArrayList<Object[]> crossed = new ArrayList<>();
-        float distanceThreshold = Settings.distanceToNodeThreshold * 1.5f;
+        float distanceThreshold = Settings.distanceToNodeThreshold * 1.5f - 1;
 
         for (Segment segment : segments) {
             if (segment == this || segment.path == null || segment.path.size() == 0)

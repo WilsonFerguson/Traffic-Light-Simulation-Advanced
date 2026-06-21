@@ -8,7 +8,7 @@ class Settings extends PFunctions {
     /**
      * Statistically, how many seconds between each spawn of a road user
      */
-    public static float trafficSpawnInterval = 0.4f;
+    public static float trafficSpawnInterval = 1f;
     public static int maxTraffic = 100;
     public static float OVSpawnChance = 0.05f;
 

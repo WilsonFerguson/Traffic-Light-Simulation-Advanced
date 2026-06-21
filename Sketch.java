@@ -1,16 +1,25 @@
 import library.core.*;
 import GameEngine.*;
 import java.util.*;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.File;
+import java.io.IOException;
 
 class Sketch extends Applet {
 
     Builder builder;
     TrafficManager trafficManager;
 
+    SimulationMode mode = SimulationMode.BUILD;
     boolean running = false;
 
+    BufferedImage image;
+    float scale = 1;
+
     public void setup() {
-        size(1000, 1000);
+        size(1200, 1200);
 
         builder = new Builder(this);
         exitOnEscape(false);
@@ -37,7 +46,7 @@ class Sketch extends Applet {
         builder.update();
         builder.show();
 
-        if (running) {
+        if (running && mode == SimulationMode.SIMULATE) {
             trafficManager.update();
         }
         trafficManager.show();
@@ -56,7 +65,7 @@ class Sketch extends Applet {
     }
 
     public void keyPressed() {
-        if (key == ' ') {
+        if (key == ' ' && !keysPressed.contains("Ctrl")) {
             running = !running;
             if (running && trafficManager.segments == null) {
                 addSegmentsToTrafficManager();

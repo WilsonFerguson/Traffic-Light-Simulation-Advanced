@@ -1,6 +1,11 @@
 import library.core.*;
 import GameEngine.*;
 import java.util.*;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.File;
+import java.io.IOException;
 
 class Builder extends PComponent {
     ArrayList<Anchor> anchors;
@@ -19,6 +24,11 @@ class Builder extends PComponent {
 
     boolean makeIntermediateAnchors = false;
 
+    BufferedImage referenceImage;
+    float referenceImageScale = 1;
+    boolean referenceImageShow = false;
+    PVector referenceImageOffset = PVector.zero();
+
     public Builder(Sketch sketch) {
         anchors = new ArrayList<Anchor>();
         segments = new ArrayList<Segment>();
@@ -31,6 +41,12 @@ class Builder extends PComponent {
         segmentPlaced = false;
 
         cursor = new Cursor(this);
+
+        try {
+            referenceImage = ImageIO.read(new File("intersection.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void update() {
@@ -62,13 +78,21 @@ class Builder extends PComponent {
     }
 
     public void show() {
+        if (referenceImageShow) {
+            AffineTransform old = getGraphics2D().getTransform();
+            getGraphics2D().scale(referenceImageScale, referenceImageScale);
+            getGraphics2D().translate(referenceImageOffset.x, referenceImageOffset.y);
+            getGraphics2D().drawImage(referenceImage, 0, 0, width, height, null);
+            getGraphics2D().setTransform(old);
+        }
+
         segments.sort(Comparator.comparingInt(o -> o.priority));
         for (Segment segment : segments) {
             if (segment == currentSegment)
                 continue;
             segment.show();
         }
-        if (!sketch.running) {
+        if (sketch.mode == SimulationMode.BUILD) {
             if (Settings.drawAnchors) {
                 for (Anchor anchor : anchors) {
                     anchor.show();
@@ -97,7 +121,7 @@ class Builder extends PComponent {
 
             currentSegment.showSelected();
         }
-        if (!sketch.running) {
+        if (sketch.mode == SimulationMode.BUILD) {
             cursor.showSnapping();
             cursor.show();
         }
@@ -275,6 +299,7 @@ class Builder extends PComponent {
 
     public void deleteCurrentSegment() {
         currentSegment.deleteSegment();
+        currentSegment = null;
     }
 
     public boolean deleteAnchor(Anchor anchor) {
@@ -348,11 +373,11 @@ class Builder extends PComponent {
                 currentSegment.setOpeningSegment(true);
                 currentAnchor.setOpeningAnchor(true);
             }
-            if (cursor.snappingToLeftOfSegment) {
-                cursor.snappingToSegment.controlLeftStart(currentSegment);
-            } else if (cursor.snappingToRightOfSegment) {
-                cursor.snappingToSegment.controlRightStart(currentSegment);
-            }
+            // if (cursor.snappingToLeftOfSegment) {
+            // cursor.snappingToSegment.controlLeftStart(currentSegment);
+            // } else if (cursor.snappingToRightOfSegment) {
+            // cursor.snappingToSegment.controlRightStart(currentSegment);
+            // }
         }
         if (hoveredAnchor != null) {
             if (hoveredAnchor.endSegments.size() == 0) {
@@ -397,10 +422,14 @@ class Builder extends PComponent {
             currentAnchor.setClosingAnchor(true);
         }
 
-        if (cursor.snappingToLeftOfSegment)
-            cursor.snappingToSegment.controlLeftEnd(currentSegment);
-        else if (cursor.snappingToRightOfSegment)
-            cursor.snappingToSegment.controlRightEnd(currentSegment);
+        // if (cursor.snappingToLeftOfSegment)
+        // cursor.snappingToSegment.controlLeftEnd(currentSegment);
+        // else if (cursor.snappingToRightOfSegment)
+        // cursor.snappingToSegment.controlRightEnd(currentSegment);
+        if (cursor.snappingToSegment != null) {
+            currentSegment.setEndControlPoint(cursor.snappingToSegment.endHeading,
+                    cursor.snappingToSegment.endControlPointMag);
+        }
     }
 
     /**
@@ -473,28 +502,39 @@ class Builder extends PComponent {
 
         boolean foundAnchor = false;
         if (direction == 1) {
-            baseSegment.controlRightStart(segment);
-            baseSegment.controlRightEnd(segment);
-            for (Segment previousSegment : baseSegment.segmentsPrevious) {
-                for (Segment seg : previousSegment.controlledFullRight) {
-                    seg.addSegmentNext(segment);
-
-                    foundAnchor = true;
-                    segment.setStartAnchor(seg.endAnchor);
-                    seg.endAnchor.beginSegments.add(segment);
-                }
-            }
+            // baseSegment.controlRightStart(segment);
+            // baseSegment.controlRightEnd(segment);
+            // for (Segment previousSegment : baseSegment.segmentsPrevious) {
+            // for (Segment seg : previousSegment.controlledFullRight) {
+            // seg.addSegmentNext(segment);
+            //
+            // foundAnchor = true;
+            // segment.setStartAnchor(seg.endAnchor);
+            // seg.endAnchor.beginSegments.add(segment);
+            // }
+            // }
         } else {
-            baseSegment.controlLeftStart(segment);
-            baseSegment.controlLeftEnd(segment);
-            for (Segment previousSegment : baseSegment.segmentsPrevious) {
-                for (Segment seg : previousSegment.controlledFullLeft) {
+            // baseSegment.controlLeftStart(segment);
+            // baseSegment.controlLeftEnd(segment);
+            // for (Segment previousSegment : baseSegment.segmentsPrevious) {
+            // for (Segment seg : previousSegment.controlledFullLeft) {
+            // seg.addSegmentNext(segment);
+            //
+            // foundAnchor = true;
+            // segment.setStartAnchor(seg.endAnchor);
+            // seg.endAnchor.beginSegments.add(segment);
+            // }
+            // }
+        }
+        for (Anchor anchor : anchors) {
+            if (anchor.pos.dist(start) < 5) {
+                foundAnchor = true;
+                segment.setStartAnchor(anchor);
+                anchor.beginSegments.add(segment);
+                for (Segment seg : anchor.endSegments) {
                     seg.addSegmentNext(segment);
-
-                    foundAnchor = true;
-                    segment.setStartAnchor(seg.endAnchor);
-                    seg.endAnchor.beginSegments.add(segment);
                 }
+                break;
             }
         }
         if (!foundAnchor) {
@@ -511,23 +551,34 @@ class Builder extends PComponent {
         segments.add(segment);
 
         foundAnchor = false;
-        for (Segment nextSegment : baseSegment.segmentsNext) {
-            if (direction == 1) {
-                for (Segment seg : nextSegment.controlledFullRight) {
+        // for (Segment nextSegment : baseSegment.segmentsNext) {
+        // if (direction == 1) {
+        // for (Segment seg : nextSegment.controlledFullRight) {
+        // seg.addSegmentPrevious(segment);
+        //
+        // foundAnchor = true;
+        // segment.setEndAnchor(seg.startAnchor);
+        // seg.startAnchor.endSegments.add(segment);
+        // }
+        // } else {
+        // for (Segment seg : nextSegment.controlledFullLeft) {
+        // seg.addSegmentPrevious(segment);
+        //
+        // foundAnchor = true;
+        // segment.setEndAnchor(seg.startAnchor);
+        // seg.startAnchor.endSegments.add(segment);
+        // }
+        // }
+        // }
+        for (Anchor anchor : anchors) {
+            if (anchor.pos.dist(segment.path.getLast()) < 5) {
+                foundAnchor = true;
+                segment.setEndAnchor(anchor);
+                anchor.endSegments.add(segment);
+                for (Segment seg : anchor.beginSegments) {
                     seg.addSegmentPrevious(segment);
-
-                    foundAnchor = true;
-                    segment.setEndAnchor(seg.startAnchor);
-                    seg.startAnchor.endSegments.add(segment);
                 }
-            } else {
-                for (Segment seg : nextSegment.controlledFullLeft) {
-                    seg.addSegmentPrevious(segment);
-
-                    foundAnchor = true;
-                    segment.setEndAnchor(seg.startAnchor);
-                    seg.startAnchor.endSegments.add(segment);
-                }
+                break;
             }
         }
         if (!foundAnchor) {
@@ -612,10 +663,14 @@ class Builder extends PComponent {
 
         newSegment(cursor.pos, currentSegment.getStraightHeading());
 
-        if (cursor.snappingToLeftOfSegment)
-            cursor.snappingToSegment.controlLeftStart(currentSegment);
-        else if (cursor.snappingToRightOfSegment)
-            cursor.snappingToSegment.controlRightStart(currentSegment);
+        // if (cursor.snappingToLeftOfSegment)
+        // cursor.snappingToSegment.controlLeftStart(currentSegment);
+        // else if (cursor.snappingToRightOfSegment)
+        // cursor.snappingToSegment.controlRightStart(currentSegment);
+        if (cursor.snappingToSegment != null) {
+            currentSegment.setStartControlPoint(cursor.snappingToSegment.startHeading,
+                    cursor.snappingToSegment.startControlPointMag);
+        }
 
         currentSegment.addSegmentPrevious(previous);
         currentSegment.setSettings(previous);
@@ -749,7 +804,7 @@ class Builder extends PComponent {
     }
 
     public void mouseClicked() {
-        if (sketch.running)
+        if (sketch.mode != SimulationMode.BUILD)
             return;
 
         if (mouseButton == RIGHT) {
@@ -784,14 +839,14 @@ class Builder extends PComponent {
                 selectSegment(hoveredSegment);
                 segmentPlaced = true;
                 return;
-            } else if (mouseButton == LEFT) {
+            } else if (mouseButton == LEFT && !hoveringSegmentInfo()) {
                 branchSegment(hoveredSegment, hoveredAnchor);
             }
         }
     }
 
     public void mouseDragged() {
-        if (mouseButton != LEFT || sketch.running)
+        if (mouseButton != LEFT || sketch.mode != SimulationMode.BUILD)
             return;
         if (cursor.draggedAnchor != null) {
             cursor.draggedAnchor.setPos(cursor.pos);
@@ -807,7 +862,7 @@ class Builder extends PComponent {
     }
 
     public void keyPressed() {
-        if (sketch.running)
+        if (sketch.mode != SimulationMode.BUILD)
             return;
 
         if (keyString.equals("Escape")) {
@@ -838,20 +893,46 @@ class Builder extends PComponent {
                 }
             }
         } else if (key == 'S') {
-            if (currentSegment != null && segmentPlaced)
-                currentSegment.segmentsNextOptions.clear();
+            if (currentSegment != null && segmentPlaced) {
+                if (currentSegment.segmentsNextOptions.size() > 0)
+                    currentSegment.segmentsNextOptions.clear();
+                else {
+                    for (Segment segment : currentSegment.segmentsNext) {
+                        currentSegment.segmentsNextOptions.add(segment);
+                    }
+                }
+            }
         } else if (key == 'r') {
             if (currentSegment != null && segmentPlaced) {
                 currentSegment.reverse();
             }
         } else if (key == 'i') {
             makeIntermediateAnchors = !makeIntermediateAnchors;
-        } else if (keyString == "Delete") {
+        } else if (keyString.equals("Delete")) {
             if (currentSegment != null)
                 deleteCurrentSegment();
             Anchor hovered = getHoveredAnchor();
             if (hovered != null)
                 deleteAnchor(hovered);
+        } else if (keyString.equals("Up") && keysPressed.contains("Ctrl")) {
+            referenceImageOffset.add(0, 25);
+        } else if (keyString.equals("Down") && keysPressed.contains("Ctrl")) {
+            referenceImageOffset.add(0, -25);
+        } else if (keyString.equals("Left") && keysPressed.contains("Ctrl")) {
+            referenceImageOffset.add(25, 0);
+        } else if (keyString.equals("Right") && keysPressed.contains("Ctrl")) {
+            referenceImageOffset.add(-25, 0);
+        } else if (key == ' ' && keysPressed.contains("Ctrl")) {
+            referenceImageShow = !referenceImageShow;
+        }
+    }
+
+    public void mouseScrolled(int amount) {
+        if (keysPressed.contains("Ctrl")) {
+            if (amount > 0)
+                referenceImageScale *= 0.9f;
+            else
+                referenceImageScale *= 1.1f;
         }
     }
 }
