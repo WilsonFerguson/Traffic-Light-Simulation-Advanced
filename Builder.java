@@ -29,6 +29,11 @@ class Builder extends PComponent {
     boolean referenceImageShow = false;
     PVector referenceImageOffset = PVector.zero();
 
+    Panel panel;
+    ArrayList<Button> buttonsSnappingOptions;
+    Button buttonHorizontalMovement;
+    Button buttonVerticalMovement;
+
     public Builder(Sketch sketch) {
         anchors = new ArrayList<Anchor>();
         segments = new ArrayList<Segment>();
@@ -47,6 +52,8 @@ class Builder extends PComponent {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        createPanel();
     }
 
     public void update() {
@@ -124,6 +131,92 @@ class Builder extends PComponent {
         if (sketch.mode == SimulationMode.BUILD) {
             cursor.showSnapping();
             cursor.show();
+
+            panel.draw();
+        }
+    }
+
+    private void createPanel() {
+        panel = new Panel(width / 8, height / 8, width / 4, height / 4);
+        panel.setCornerRadius(0);
+
+        float w = panel.size.x / ((TrafficType.values().length + 1) * 1.2f);
+        float margin = w * 0.2f;
+        int numButtonsRow = 6;
+
+        createButtonsSnapping(w, margin, numButtonsRow);
+        createButtonsHorizontalMovement(w, margin, numButtonsRow);
+
+        // Set size
+        float bottomY = panel.getElements().getLast().pos.y;
+        float topY = panel.getElements().getFirst().pos.y;
+        float padding = (w / 2 + margin) * 2;
+        float sizeY = bottomY - topY + padding;
+        panel.setSize(panel.size.x, sizeY);
+        float marginPanel = 10;
+        float yOffset = sketch.modePanel.pos.y + sketch.modePanel.size.y / 2;
+        panel.pos = new PVector(panel.size.x / 2 + marginPanel, sizeY / 2 + marginPanel + yOffset);
+        for (UIElement element : panel.getElements()) {
+            element.pos.add(marginPanel, marginPanel + yOffset);
+        }
+
+        panel.setActive(true);
+    }
+
+    public float calculateButtonX(float i, float w, float margin) {
+        int numButtons = TrafficType.values().length;
+
+        return map(i, 0, numButtons - 1, -panel.size.x / 2 + w / 2 + margin,
+                panel.size.x / 2 - w / 2 - margin);
+
+    }
+
+    private void createButtonsSnapping(float w, float margin, int numButtonsRow) {
+        panel.incrementElementHeight(margin + w / 2);
+
+        String[] texts = new String[] { "L/R", "A", "W", "90", "H", "G", "MS", "MW" };
+        buttonsSnappingOptions = new ArrayList<Button>(texts.length);
+
+        for (int i = 0; i < texts.length; i++) {
+            float x = calculateButtonX(i % numButtonsRow, w, margin);
+            Button button = new Button(x, 0, w, w, texts[i]);
+
+            setButtonColor(button, cursor.enabledSnappingOptions[i]);
+
+            final int index = i;
+            button.onClick(new Runnable() {
+                @Override
+                public void run() {
+                    cursor.enabledSnappingOptions[index] = !cursor.enabledSnappingOptions[index];
+                    setButtonColor(button, cursor.enabledSnappingOptions[index]);
+                }
+            });
+
+            buttonsSnappingOptions.add(button);
+            panel.addElementFromTop(button, false);
+            if (i > 0 && i % (numButtonsRow - 1) == 0) {
+                panel.incrementElementHeight(w + margin);
+            }
+        }
+    }
+
+    private void createButtonsHorizontalMovement(float w, float margin, int numButtonsRow) {
+        buttonHorizontalMovement = new Button(calculateButtonX(numButtonsRow - 2, w, margin), 0, w, w, ">");
+        buttonVerticalMovement = new Button(calculateButtonX(numButtonsRow - 1, w, margin), 0, w, w, "v");
+
+        panel.addElementFromTop(buttonHorizontalMovement, false);
+        panel.addElementFromTop(buttonVerticalMovement, false);
+    }
+
+    private void setButtonColor(Button button, boolean active) {
+        if (active) {
+            button.setDefaultColor(Settings.buttonAccentDefault);
+            button.setHoverColor(Settings.buttonAccentHover);
+            button.setActiveColor(Settings.buttonAccentActive);
+        } else {
+            button.setDefaultColor(Settings.buttonDefault);
+            button.setHoverColor(Settings.buttonHover);
+            button.setActiveColor(Settings.buttonActive);
         }
     }
 
@@ -193,6 +286,10 @@ class Builder extends PComponent {
             return false;
 
         return (currentSegment.segmentEditorPanel.isActive() && currentSegment.segmentEditorPanel.hover());
+    }
+
+    public boolean hoveringPanel() {
+        return panel.hover() || sketch.modePanel.hover();
     }
 
     public Anchor getHoveredAnchor() {
@@ -807,6 +904,21 @@ class Builder extends PComponent {
         if (sketch.mode != SimulationMode.BUILD)
             return;
 
+        if (mouseButton == LEFT) {
+            if (buttonHorizontalMovement.hover()) {
+                sketch.modePanel.setPos(width - sketch.modePanel.pos.x, sketch.modePanel.pos.y);
+                panel.setPos(width - panel.pos.x, panel.pos.y);
+                buttonHorizontalMovement.setText(panel.pos.x < width / 2 ? ">" : "<");
+                return;
+            }
+            if (buttonVerticalMovement.hover()) {
+                sketch.modePanel.setPos(sketch.modePanel.pos.x, height - sketch.modePanel.pos.y);
+                panel.setPos(panel.pos.x, height - panel.pos.y);
+                buttonVerticalMovement.setText(panel.pos.y < height / 2 ? "v" : "^");
+                return;
+            }
+        }
+
         if (mouseButton == RIGHT) {
             if (currentSegment != null)
                 deselectSegment();
@@ -818,13 +930,15 @@ class Builder extends PComponent {
         // Make brand new segment that starts a path
         Anchor hoveredAnchor = getHoveredAnchor();
         Segment hoveredSegment = getHoveredSegment();
-        if (currentAnchor == null && currentSegment == null && hoveredSegment == null && mouseButton == LEFT) {
+        if (currentAnchor == null && currentSegment == null && hoveredSegment == null && mouseButton == LEFT
+                && !hoveringPanel()) {
             createBrandNewSegment(hoveredAnchor, hoveredSegment);
             return;
         }
 
         // Make new segment that continues path
-        if (currentSegment != null && !segmentPlaced && !hoveringSegmentInfo() && mouseButton == LEFT) {
+        if (currentSegment != null && !segmentPlaced && !hoveringSegmentInfo() && !hoveringPanel()
+                && mouseButton == LEFT) {
             if (hoveredAnchor == null)
                 completeCurrentSegmentFree();
             else
@@ -839,7 +953,7 @@ class Builder extends PComponent {
                 selectSegment(hoveredSegment);
                 segmentPlaced = true;
                 return;
-            } else if (mouseButton == LEFT && !hoveringSegmentInfo()) {
+            } else if (mouseButton == LEFT && !hoveringSegmentInfo() && !hoveringPanel()) {
                 branchSegment(hoveredSegment, hoveredAnchor);
             }
         }

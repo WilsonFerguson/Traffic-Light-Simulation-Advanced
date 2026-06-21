@@ -7,7 +7,6 @@ class Segment extends PComponent {
 
     Panel segmentEditorPanel;
     ArrayList<Button> buttonsTrafficTypes;
-    ArrayList<Button> buttonsSnappingOptions;
     Button buttonPathColor;
     ColorPicker colorPickerPathColor;
     Text textPathColor;
@@ -98,12 +97,11 @@ class Segment extends PComponent {
         float margin = w * 0.2f;
 
         createButtonsTrafficType(w, margin);
-        createButtonsSnappingOptions(w, margin);
-        createButtonPathColor(w, margin);
-        createInputFieldSegmentWidth(w, margin);
-        createButtonsSegmentPriority(w, margin);
-        createButtonsParallel(w, margin);
         createButtonsSegmentType(w, margin);
+        createButtonsParallel(w, margin);
+        createButtonsSegmentPriority(w, margin);
+        createInputFieldSegmentWidth(w, margin);
+        createButtonPathColor(w, margin);
 
         // Set size
         float bottomY = segmentEditorPanel.getElements().getLast().pos.y;
@@ -119,13 +117,6 @@ class Segment extends PComponent {
         segmentEditorPanel.setActive(false);
     }
 
-    private float calculateButtonX(float i, float w, float margin) {
-        int numButtons = TrafficType.values().length;
-
-        return map(i, 0, numButtons - 1, -segmentEditorPanel.size.x / 2 + w / 2 + margin,
-                segmentEditorPanel.size.x / 2 - w / 2 - margin);
-    }
-
     private void createButtonsTrafficType(float w, float margin) {
         int numButtons = TrafficType.values().length;
         buttonsTrafficTypes = new ArrayList<Button>(numButtons);
@@ -136,7 +127,7 @@ class Segment extends PComponent {
 
         for (int i = 0; i < numButtons; i++) {
             TrafficType trafficTypeButton = TrafficType.values()[i];
-            float x = calculateButtonX(i, w, margin);
+            float x = builder.calculateButtonX(i, w, margin);
 
             Button button = new Button(x, 0, w, w, texts[i]);
 
@@ -156,33 +147,6 @@ class Segment extends PComponent {
             });
 
             buttonsTrafficTypes.add(button);
-            segmentEditorPanel.addElementFromTop(button, false);
-        }
-    }
-
-    public void createButtonsSnappingOptions(float w, float margin) {
-        segmentEditorPanel.incrementElementHeight(w + margin);
-
-        int numButtons = 6;
-        buttonsSnappingOptions = new ArrayList<Button>(numButtons);
-        String[] texts = new String[] { "L/R", "A", "W", "90", "H", "G" };
-
-        for (int i = 0; i < numButtons; i++) {
-            float x = calculateButtonX(i, w, margin);
-            Button button = new Button(x, 0, w, w, texts[i]);
-
-            setButtonColor(button, builder.cursor.enabledSnappingOptions[i]);
-
-            final int index = i;
-            button.onClick(new Runnable() {
-                @Override
-                public void run() {
-                    builder.cursor.enabledSnappingOptions[index] = !builder.cursor.enabledSnappingOptions[index];
-                    setButtonColor(button, builder.cursor.enabledSnappingOptions[index]);
-                }
-            });
-
-            buttonsSnappingOptions.add(button);
             segmentEditorPanel.addElementFromTop(button, false);
         }
     }
@@ -216,7 +180,7 @@ class Segment extends PComponent {
             }
         });
 
-        colorPickerPathColor = new ColorPicker(PVector.center());
+        colorPickerPathColor = new ColorPicker(PVector.zero());
         colorPickerPathColor.setActive(false);
         colorPickerPathColor.onChangeColor(new Runnable() {
             @Override
@@ -241,7 +205,8 @@ class Segment extends PComponent {
         textSegmentWidth = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Path width(m)")
                 .setTextAlignment(TextAlignment.LEFT);
 
-        buttonSegmentWidthDecrease = new Button(calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w, w,
+        buttonSegmentWidthDecrease = new Button(builder.calculateButtonX(TrafficType.values().length - 3, w, margin), 0,
+                w, w,
                 "-");
         buttonSegmentWidthDecrease.onClick(new Runnable() {
             @Override
@@ -260,7 +225,7 @@ class Segment extends PComponent {
             }
         });
 
-        float x = calculateButtonX(buttonsTrafficTypes.size() - 2, w, margin);
+        float x = builder.calculateButtonX(buttonsTrafficTypes.size() - 2, w, margin);
         inputFieldSegmentWidth = new InputField(x, 0, w, w)
                 .setDefaultText("").setAutoResize(false).setTextAlignment(TextAlignment.CENTER).setNumbersOnly(true);
 
@@ -282,7 +247,8 @@ class Segment extends PComponent {
             }
         });
 
-        buttonSegmentWidthIncrease = new Button(calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w, w,
+        buttonSegmentWidthIncrease = new Button(builder.calculateButtonX(TrafficType.values().length - 1, w, margin), 0,
+                w, w,
                 "+");
         buttonSegmentWidthIncrease.onClick(new Runnable() {
             @Override
@@ -313,7 +279,8 @@ class Segment extends PComponent {
         textSegmentPriority = new Text(-segmentEditorPanel.size.x / 2 + margin, 0, "Priority")
                 .setTextAlignment(TextAlignment.LEFT);
 
-        buttonSegmentPriorityDecrease = new Button(calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w,
+        buttonSegmentPriorityDecrease = new Button(builder.calculateButtonX(TrafficType.values().length - 3, w, margin),
+                0, w,
                 w, "-");
         buttonSegmentPriorityDecrease.onClick(new Runnable() {
             @Override
@@ -325,7 +292,8 @@ class Segment extends PComponent {
             }
         });
 
-        inputFieldSegmentPriority = new InputField(calculateButtonX(TrafficType.values().length - 2, w, margin), 0, w,
+        inputFieldSegmentPriority = new InputField(builder.calculateButtonX(TrafficType.values().length - 2, w, margin),
+                0, w,
                 w).setTextAlignment(TextAlignment.CENTER).setNumbersOnly(true).setAutoResize(false);
         inputFieldSegmentPriority.setText(String.valueOf(priority));
         inputFieldSegmentPriority.onInput(new Runnable() {
@@ -355,7 +323,8 @@ class Segment extends PComponent {
             }
         });
 
-        buttonSegmentPriorityIncrease = new Button(calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w,
+        buttonSegmentPriorityIncrease = new Button(builder.calculateButtonX(TrafficType.values().length - 1, w, margin),
+                0, w,
                 w, "+");
         buttonSegmentPriorityIncrease.onClick(new Runnable() {
             @Override
@@ -376,7 +345,7 @@ class Segment extends PComponent {
     public void createButtonsParallel(float w, float margin) {
         segmentEditorPanel.incrementElementHeight(margin + w);
 
-        buttonParallel = new Button(calculateButtonX(1, w, margin), 0, w * 3 + margin * 4, w, "Parallel");
+        buttonParallel = new Button(builder.calculateButtonX(1, w, margin), 0, w * 3 + margin * 4, w, "Parallel");
         buttonParallel.onClick(new Runnable() {
             @Override
             public void run() {
@@ -385,7 +354,7 @@ class Segment extends PComponent {
             }
         });
 
-        buttonParallelDecrease = new Button(calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w,
+        buttonParallelDecrease = new Button(builder.calculateButtonX(TrafficType.values().length - 3, w, margin), 0, w,
                 w, "-");
         buttonParallelDecrease.onClick(new Runnable() {
             @Override
@@ -399,7 +368,7 @@ class Segment extends PComponent {
             }
         });
 
-        inputFieldParallel = new InputField(calculateButtonX(TrafficType.values().length - 2, w, margin), 0, w,
+        inputFieldParallel = new InputField(builder.calculateButtonX(TrafficType.values().length - 2, w, margin), 0, w,
                 w).setTextAlignment(TextAlignment.CENTER).setNumbersOnly(true).setAutoResize(false);
         inputFieldParallel.setText(String.valueOf(builder.parallelNumSegments));
         inputFieldParallel.onInput(new Runnable() {
@@ -444,7 +413,7 @@ class Segment extends PComponent {
             }
         });
 
-        buttonParallelIncrease = new Button(calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w,
+        buttonParallelIncrease = new Button(builder.calculateButtonX(TrafficType.values().length - 1, w, margin), 0, w,
                 w, "+");
         buttonParallelIncrease.onClick(new Runnable() {
             @Override
@@ -468,7 +437,7 @@ class Segment extends PComponent {
         segmentEditorPanel.incrementElementHeight(margin + w);
 
         int numButtons = TrafficType.values().length;
-        buttonTypeStraight = new Button(calculateButtonX(numButtons * 1.0f / 3.0f - 1, w, margin), 0,
+        buttonTypeStraight = new Button(builder.calculateButtonX(numButtons * 1.0f / 3.0f - 1, w, margin), 0,
                 3 * w + 4 * margin, w, "Straight");
         buttonTypeStraight.onClick(new Runnable() {
             @Override
@@ -481,7 +450,7 @@ class Segment extends PComponent {
                 updatePath();
             }
         });
-        buttonTypeBezier = new Button(calculateButtonX(numButtons * 2.0f / 3.0f, w, margin), 0,
+        buttonTypeBezier = new Button(builder.calculateButtonX(numButtons * 2.0f / 3.0f, w, margin), 0,
                 3 * w + 4 * margin, w, "Bezier");
         buttonTypeBezier.onClick(new Runnable() {
             @Override
@@ -737,8 +706,11 @@ class Segment extends PComponent {
             element.setActive(true);
         }
 
-        float margin = segmentEditorPanel.size.x / 10;
-        segmentEditorPanel.setPos(margin + segmentEditorPanel.size.x / 2, margin + segmentEditorPanel.size.y / 2);
+        float margin = 10;
+        float yOffset = builder.panel.size.y / 2 + margin + segmentEditorPanel.size.y / 2;
+        float yTarget = (builder.panel.pos.y > height / 2) ? builder.panel.pos.y - yOffset
+                : builder.panel.pos.y + yOffset;
+        segmentEditorPanel.setPos(builder.panel.pos.x, yTarget);
 
         colorPickerPathColor.setColorPreviewPosition();
 
@@ -748,10 +720,6 @@ class Segment extends PComponent {
     public void updateUIWithValues() {
         for (int i = 0; i < buttonsTrafficTypes.size(); i++) {
             setButtonColor(buttonsTrafficTypes.get(i), trafficType == TrafficType.values()[i]);
-        }
-
-        for (int i = 0; i < buttonsSnappingOptions.size(); i++) {
-            setButtonColor(buttonsSnappingOptions.get(i), builder.cursor.enabledSnappingOptions[i]);
         }
 
         colorPickerPathColor.setColor(segmentColor);
@@ -1271,10 +1239,6 @@ class Segment extends PComponent {
         segmentEditorPanel.setActive(false);
         delete(segmentEditorPanel);
         for (Button button : buttonsTrafficTypes) {
-            button.setActive(false);
-            delete(button);
-        }
-        for (Button button : buttonsSnappingOptions) {
             button.setActive(false);
             delete(button);
         }

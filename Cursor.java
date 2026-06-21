@@ -26,9 +26,9 @@ class Cursor extends PComponent {
 
     /**
      * Left/right snapping, anchor snapping, wall snapping, 90 snapping, heading
-     * snapping, guidelines snapping
+     * snapping, guidelines snapping, middle segment, middle wall
      */
-    boolean[] enabledSnappingOptions = { true, true, true, true, true, true };
+    boolean[] enabledSnappingOptions = { true, true, true, true, true, true, true, true };
 
     boolean fixedX = false;
     boolean fixedY = false;
@@ -48,7 +48,7 @@ class Cursor extends PComponent {
     public void update(Segment currentSegment, ArrayList<Anchor> anchors, ArrayList<Segment> segments) {
         resetVariables();
 
-        if (builder.hoveringSegmentInfo())
+        if (builder.hoveringSegmentInfo() || builder.hoveringPanel())
             return;
 
         // Absolute snaps (cannot combine with other snapping)
@@ -58,8 +58,7 @@ class Cursor extends PComponent {
         if (enabledSnappingOptions[1] && snapAnchors(currentSegment, anchors)) {
             return;
         }
-        // TODO: Make this togglable
-        if (snapMiddleSegment()) {
+        if (snapMiddleSegment() && enabledSnappingOptions[6]) {
             return;
         }
 
@@ -67,12 +66,10 @@ class Cursor extends PComponent {
         if (enabledSnappingOptions[2]) {
             snapWalls();
         }
-
-        // TODO: Make this togglable
-        snapMiddleScreen();
-
+        if (enabledSnappingOptions[7]) {
+            snapMiddleScreen();
+        }
         snapAngles(currentSegment);
-
         if (enabledSnappingOptions[5]) {
             snapGuidelines();
         }
