@@ -6,7 +6,7 @@ class Settings extends PFunctions {
     public static boolean drawAnchors = true;
 
     /**
-     * Statistically, how many seconds between each spawn of a road user
+     * Statistically, how many seconds between each spawn of a road user.
      */
     public static float trafficSpawnInterval = 1f;
     public static int maxTraffic = 100;
@@ -23,10 +23,10 @@ class Settings extends PFunctions {
      */
     public static float segmentWidthPadding = 1.05f;
 
-    public static int segmentPriorityOV = 8;
+    public static int segmentPriorityOV = 10;
     public static int segmentPriorityCar = 5;
-    public static int segmentPriorityBike = 7;
-    public static int segmentPriorityPedestrian = 6;
+    public static int segmentPriorityBike = 8;
+    public static int segmentPriorityPedestrian = 7;
 
     public static float vehicleWidthOV = 2.5f * pixelsPerMeter;
     public static float vehicleWidthCar = 1.9f * pixelsPerMeter;
@@ -56,9 +56,22 @@ class Settings extends PFunctions {
     public static float variationMaxSpeed = 0.22f;
     public static float variationReactionTime = 0.2f;
 
+    public static float yellowTime = 2.5f;
+    public static float greenTimeMinimum = 4f;
+    public static float redTimeMinimum = 1f;
+
     public static color lightGreen = new color(36, 156, 42);
     public static color lightYellow = new color(207, 176, 54);
     public static color lightRed = new color(189, 57, 47);
+    /**
+     * How many frames in between each toggle of on or off of the pedestrian light.
+     */
+    public static int lightPedestrianFlashInterval = 17;
+
+    public static int weightsDetectedCount = 5;
+    public static int weightsWaitTime = 2;
+    public static int weightsQueueSensor = 21;
+    public static int noDetectionTime = 1 * 60;
 
     public static color controlPointColor = new color(173, 68, 199);
 

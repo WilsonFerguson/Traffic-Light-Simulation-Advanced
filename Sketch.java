@@ -11,6 +11,7 @@ class Sketch extends Applet {
 
     Builder builder;
     TrafficManager trafficManager;
+    iVRI iVRI;
 
     SimulationMode mode = SimulationMode.BUILD;
     boolean running = false;
@@ -38,6 +39,7 @@ class Sketch extends Applet {
 
         builder = new Builder(this);
         trafficManager = new TrafficManager(builder);
+        iVRI = new iVRI(this);
     }
 
     public void draw() {
@@ -51,6 +53,10 @@ class Sketch extends Applet {
             trafficManager.update();
         }
         trafficManager.show();
+
+        iVRI.setActiveUI(mode == SimulationMode.LIGHT);
+        iVRI.update();
+        iVRI.show();
 
         modePanel.draw();
     }
@@ -85,7 +91,6 @@ class Sketch extends Applet {
 
         return map(i, 0, numButtons - 1, -modePanel.size.x / 2 + w / 2 + margin,
                 modePanel.size.x / 2 - w / 2 - margin);
-
     }
 
     private void setButtonColor(Button button, boolean active) {

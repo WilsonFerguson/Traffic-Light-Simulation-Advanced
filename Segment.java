@@ -5,6 +5,8 @@ import java.util.*;
 class Segment extends PComponent {
     Builder builder;
 
+    int id;
+
     Panel segmentEditorPanel;
     ArrayList<Button> buttonsTrafficTypes;
     Button buttonPathColor;
@@ -67,12 +69,13 @@ class Segment extends PComponent {
     boolean openingSegment;
     boolean closingSegment;
 
-    public Segment(Builder builder, PVector pos) {
-        this(builder, pos, TrafficType.CAR);
+    public Segment(Builder builder, PVector pos, int id) {
+        this(builder, pos, TrafficType.CAR, id);
     }
 
-    private Segment(Builder builder, PVector pos, TrafficType trafficType) {
+    private Segment(Builder builder, PVector pos, TrafficType trafficType, int id) {
         this.builder = builder;
+        this.id = id;
         type = SegmentType.STRAIGHT;
 
         start = pos.copy();
@@ -523,7 +526,7 @@ class Segment extends PComponent {
                 int numNodes = ceil(dist / Settings.distanceToNodeThreshold);
 
                 if (numNodes > 10000)
-                    println("Warning! numNodes > 10000 in calculatePaths() Cursor:", builder.cursor.pos);
+                    System.err.println("Warning! numNodes > 10000 in calculatePaths() Cursor: " + builder.cursor.pos);
 
                 if (numNodes == 0) {
                     path.add(start);
@@ -654,6 +657,7 @@ class Segment extends PComponent {
         drawPath(path);
 
         // drawPathPoints();
+        // drawID();
     }
 
     public void showSelected() {
@@ -668,7 +672,10 @@ class Segment extends PComponent {
 
         noStroke();
         // drawPathPoints();
-        drawDirectionArrow();
+
+        if (trafficType != TrafficType.BIKE_2WAY && trafficType != TrafficType.PEDESTRIAN)
+            drawDirectionArrow();
+
         drawControlPoints();
 
         updateEditorPanel();
@@ -676,12 +683,15 @@ class Segment extends PComponent {
         strokeWeight(3);
     }
 
-    private void drawNextOptions() {
-        // fill(color(Settings.lightRed, 80));
+    public void highlight() {
         fill(Settings.lightYellow, 160);
         noStroke();
+        drawPath(path);
+    }
+
+    private void drawNextOptions() {
         for (Segment segment : segmentsNextOptions) {
-            segment.drawPath(segment.path);
+            segment.highlight();
         }
     }
 
@@ -804,6 +814,12 @@ class Segment extends PComponent {
         // stroke(255);
         // strokeWeight(3);
         // }
+    }
+
+    public void drawID() {
+        fill(0);
+        textSize(25);
+        text(id, path.get(path.size() / 2));
     }
 
     public void drawControlPoints() {
@@ -1365,7 +1381,7 @@ class Segment extends PComponent {
     }
 
     public Segment copy() {
-        Segment copy = new Segment(builder, start, trafficType);
+        Segment copy = new Segment(builder, start, trafficType, id);
 
         copy.builder = builder;
 

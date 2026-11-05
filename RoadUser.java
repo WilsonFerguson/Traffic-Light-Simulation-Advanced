@@ -126,6 +126,8 @@ class RoadUser extends PComponent {
         // TODO: consider other segments that just cross ours
         // AND: consider the width of the segment for determining where to stop
 
+        // TODO: stopping at red lights
+
         speed += appliedAcceleration * dt;
         if (speed > maxSpeed)
             speed = maxSpeed;

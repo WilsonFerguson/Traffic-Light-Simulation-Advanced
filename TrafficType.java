@@ -82,7 +82,15 @@ enum TrafficType {
         throw new RuntimeException("Somehow getMaxSpeed() could not find a value for TrafficType " + this);
     }
 
+    public boolean isBike() {
+        return this == BIKE_1WAY || this == BIKE_2WAY;
+    }
+
     public boolean isVulnerable() {
-        return this == BIKE_1WAY || this == BIKE_2WAY || this == PEDESTRIAN;
+        return isBike() || this == PEDESTRIAN;
+    }
+
+    public boolean isBidirectional() {
+        return this == BIKE_2WAY || this == PEDESTRIAN;
     }
 }

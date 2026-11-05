@@ -142,36 +142,38 @@ public class TrafficManager extends PComponent {
         }
     }
 
-    public void mouseClicked() {
-        if (mouseButton != LEFT)
-            return;
-
-        if (builder.currentSegment == null && builder.currentAnchor == null && segments != null) {
-            Segment segment = builder.getHoveredSegment();
-            if (segment == null)
-                return;
-
-            PVector closestNode = null;
-            float closestDistance = Float.MAX_VALUE;
-            int closestIndex = -1;
-            for (int i = 0; i < segment.path.size(); i++) {
-                PVector node = segment.path.get(i);
-                float distance = PVector.dist(mouse, node);
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestNode = node;
-                    closestIndex = i;
-                }
-            }
-
-            RoadUser roadUser = new RoadUser(this, segment);
-            roadUser.targetSegmentIndex = closestIndex + 1;
-            roadUser.pos = closestNode.copy();
-            roadUser.heading = PVector.sub(segment.getNode(closestIndex + 1), segment.getNode(closestIndex - 1))
-                    .heading();
-            roadUser.speed = 0;
-
-            traffic.add(roadUser);
-        }
-    }
+    // public void mouseClicked() {
+    // if (mouseButton != LEFT)
+    // return;
+    //
+    // if (builder.currentSegment == null && builder.currentAnchor == null &&
+    // segments != null) {
+    // Segment segment = builder.getHoveredSegment();
+    // if (segment == null)
+    // return;
+    //
+    // PVector closestNode = null;
+    // float closestDistance = Float.MAX_VALUE;
+    // int closestIndex = -1;
+    // for (int i = 0; i < segment.path.size(); i++) {
+    // PVector node = segment.path.get(i);
+    // float distance = PVector.dist(mouse, node);
+    // if (distance < closestDistance) {
+    // closestDistance = distance;
+    // closestNode = node;
+    // closestIndex = i;
+    // }
+    // }
+    //
+    // RoadUser roadUser = new RoadUser(this, segment);
+    // roadUser.targetSegmentIndex = closestIndex + 1;
+    // roadUser.pos = closestNode.copy();
+    // roadUser.heading = PVector.sub(segment.getNode(closestIndex + 1),
+    // segment.getNode(closestIndex - 1))
+    // .heading();
+    // roadUser.speed = 0;
+    //
+    // traffic.add(roadUser);
+    // }
+    // }
 }

@@ -10,6 +10,7 @@ import java.io.IOException;
 class Builder extends PComponent {
     ArrayList<Anchor> anchors;
     ArrayList<Segment> segments;
+    int segmentID = 0;
 
     Sketch sketch;
     Cursor cursor;
@@ -234,7 +235,9 @@ class Builder extends PComponent {
     }
 
     public void newSegment(PVector pos) {
-        currentSegment = new Segment(this, pos.copy());
+        currentSegment = new Segment(this, pos.copy(), segmentID);
+        segmentID++;
+
         currentSegment.setStartAnchor(currentAnchor);
         segments.add(currentSegment);
         segmentPlaced = false;
@@ -243,7 +246,9 @@ class Builder extends PComponent {
     }
 
     public void newSegment(PVector pos, float heading) {
-        currentSegment = new Segment(this, pos.copy());
+        currentSegment = new Segment(this, pos.copy(), segmentID);
+        segmentID++;
+
         currentSegment.setStartAnchor(currentAnchor);
         currentSegment.setStartHeading(heading, true);
         segments.add(currentSegment);
@@ -593,7 +598,8 @@ class Builder extends PComponent {
                 .setMag(baseSegment.segmentWidth);
         PVector start = PVector.add(baseSegment.getStartNode(), offset);
 
-        Segment segment = new Segment(this, start);
+        Segment segment = new Segment(this, start, segmentID);
+        segmentID++;
         segment.setStartControlPoint(baseSegment.startHeading, baseSegment.startControlPointMag);
         segment.setEndControlPoint(baseSegment.endHeading, baseSegment.endControlPointMag);
 
@@ -881,7 +887,8 @@ class Builder extends PComponent {
         }
 
         lastSelectedSegment = hoveredSegment;
-        currentSegment = new Segment(this, pos.copy());
+        currentSegment = new Segment(this, pos.copy(), segmentID);
+        segmentID++;
         currentSegment.setStartAnchor(currentAnchor);
 
         int index0 = hoveredSegment.path.indexOf(sortedPath.get(0));
