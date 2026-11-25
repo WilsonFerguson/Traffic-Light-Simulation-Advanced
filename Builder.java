@@ -1,6 +1,7 @@
 import library.core.*;
 import GameEngine.*;
 import java.util.*;
+import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
@@ -10,6 +11,7 @@ import java.io.IOException;
 class Builder extends PComponent {
     ArrayList<Anchor> anchors;
     ArrayList<Segment> segments;
+    int anchorID = 0;
     int segmentID = 0;
 
     Sketch sketch;
@@ -35,6 +37,8 @@ class Builder extends PComponent {
     Button buttonHorizontalMovement;
     Button buttonVerticalMovement;
 
+    boolean drawRoads = true;
+
     public Builder(Sketch sketch) {
         anchors = new ArrayList<Anchor>();
         segments = new ArrayList<Segment>();
@@ -49,7 +53,7 @@ class Builder extends PComponent {
         cursor = new Cursor(this);
 
         try {
-            referenceImage = ImageIO.read(new File("intersection.png"));
+            referenceImage = ImageIO.read(new File("images/intersection.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -87,11 +91,26 @@ class Builder extends PComponent {
 
     public void show() {
         if (referenceImageShow) {
-            AffineTransform old = getGraphics2D().getTransform();
-            getGraphics2D().scale(referenceImageScale, referenceImageScale);
-            getGraphics2D().translate(referenceImageOffset.x, referenceImageOffset.y);
-            getGraphics2D().drawImage(referenceImage, 0, 0, width, height, null);
-            getGraphics2D().setTransform(old);
+            noSmooth();
+
+            Graphics2D g2d = getGraphics2D();
+            AffineTransform old = g2d.getTransform();
+
+            float zoom = 1 + sketch.scale;
+            PVector center = PVector.center();
+
+            g2d.scale(zoom, zoom);
+            g2d.translate(
+                    sketch.translation.x - center.x * sketch.scale / zoom,
+                    sketch.translation.y - center.y * sketch.scale / zoom);
+
+            g2d.scale(referenceImageScale, referenceImageScale);
+            g2d.translate(referenceImageOffset.x, referenceImageOffset.y);
+
+            g2d.drawImage(referenceImage, 0, 0, width, height, null);
+
+            g2d.setTransform(old);
+            smooth();
         }
 
         segments.sort(Comparator.comparingInt(o -> o.priority));
@@ -107,6 +126,16 @@ class Builder extends PComponent {
                 }
             }
         }
+
+        // Draw border around simulation (offset everything away from screen by the
+        // stroke weight so the outline isn't normally seen)
+        float weight = 2;
+        strokeWeight(weight);
+        stroke(0);
+        line(-weight, -weight, width + weight, -weight);
+        line(width + weight, -weight, width, height + weight);
+        line(width + weight, height + weight, -weight, height);
+        line(-weight, height + weight, -weight, -weight);
 
         if (currentAnchor != null) {
             currentAnchor.show();
@@ -229,9 +258,16 @@ class Builder extends PComponent {
         segments.add(segment);
     }
 
+    public Anchor createAnchor(PVector pos) {
+        Anchor anchor = new Anchor(this, anchorID, pos.copy());
+        anchorID++;
+        anchors.add(anchor);
+
+        return anchor;
+    }
+
     public void newAnchor(PVector pos) {
-        currentAnchor = new Anchor(this, pos.copy());
-        anchors.add(currentAnchor);
+        currentAnchor = createAnchor(pos);
     }
 
     public void newSegment(PVector pos) {
@@ -475,6 +511,10 @@ class Builder extends PComponent {
                 currentSegment.setOpeningSegment(true);
                 currentAnchor.setOpeningAnchor(true);
             }
+            if (cursor.snappingToSegment != null) {
+                if (cursor.snappingToSegment.openingSegment)
+                    currentSegment.setOpeningSegment(true);
+            }
             // if (cursor.snappingToLeftOfSegment) {
             // cursor.snappingToSegment.controlLeftStart(currentSegment);
             // } else if (cursor.snappingToRightOfSegment) {
@@ -541,6 +581,8 @@ class Builder extends PComponent {
      */
     private Segment splitSegment(Segment original, Anchor anchor) {
         Segment next = original.copy();
+        next.id = segmentID;
+        segmentID++;
 
         for (Segment segment : original.segmentsNext)
             segment.segmentsPrevious.remove(original);
@@ -641,8 +683,7 @@ class Builder extends PComponent {
             }
         }
         if (!foundAnchor) {
-            Anchor startAnchor = new Anchor(this, start.copy());
-            anchors.add(startAnchor);
+            Anchor startAnchor = createAnchor(start.copy());
             segment.setStartAnchor(startAnchor);
         }
 
@@ -685,8 +726,7 @@ class Builder extends PComponent {
             }
         }
         if (!foundAnchor) {
-            Anchor endAnchor = new Anchor(this, segment.path.getLast().copy());
-            anchors.add(endAnchor);
+            Anchor endAnchor = createAnchor(segment.path.getLast().copy());
             endAnchor.setClosingAnchor(segment.closingSegment);
             segment.setEndAnchor(endAnchor);
         }
@@ -700,8 +740,7 @@ class Builder extends PComponent {
             if (data.getLast()[1] == null)
                 throw new RuntimeException("Anchor position is null when making this t-junction");
 
-            Anchor junctionAnchor = new Anchor(this, (PVector) data.getLast()[1]);
-            anchors.add(junctionAnchor);
+            Anchor junctionAnchor = createAnchor((PVector) data.getLast()[1]);
             makeTJunction((Segment) data.getLast()[0], segment, junctionAnchor);
         }
 
@@ -726,8 +765,7 @@ class Builder extends PComponent {
     }
 
     private Segment make4WayJunction(Segment crossed, Segment comingIn, PVector intersection) {
-        Anchor anchor = new Anchor(this, intersection);
-        anchors.add(anchor);
+        Anchor anchor = createAnchor(intersection);
         return make4WayJunction(crossed, comingIn, anchor);
     }
 
@@ -879,8 +917,7 @@ class Builder extends PComponent {
         PVector pos = PVector.add(sortedPath.get(0), sortedPath.get(1)).div(2);
 
         if (hoveredAnchor == null) {
-            currentAnchor = new Anchor(this, pos.copy());
-            anchors.add(currentAnchor);
+            newAnchor(pos.copy());
         } else {
             currentAnchor = hoveredAnchor;
             pos = currentAnchor.pos;
@@ -952,7 +989,7 @@ class Builder extends PComponent {
                 completeCurrentSegmentWithAnchor(hoveredAnchor);
         }
 
-        if (hoveredSegment != null && (currentSegment == null || segmentPlaced)) {
+        if (hoveredSegment != null && getHoveredAnchor() == null && (currentSegment == null || segmentPlaced)) {
             // 2 = middle
             if (mouseButton == 2) {
                 if (currentSegment != null)
@@ -967,7 +1004,8 @@ class Builder extends PComponent {
     }
 
     public void mouseDragged() {
-        if (mouseButton != LEFT || sketch.mode != SimulationMode.BUILD)
+        // 2 = middle
+        if (mouseButton != 2 || sketch.mode != SimulationMode.BUILD)
             return;
         if (cursor.draggedAnchor != null) {
             cursor.draggedAnchor.setPos(cursor.pos);
@@ -983,6 +1021,10 @@ class Builder extends PComponent {
     }
 
     public void keyPressed() {
+        if (key == 'p') {
+            drawRoads = !drawRoads;
+        }
+
         if (sketch.mode != SimulationMode.BUILD)
             return;
 
@@ -991,6 +1033,24 @@ class Builder extends PComponent {
                 deselectSegment();
             else if (currentAnchor != null)
                 deselectAnchor();
+        } else if (key == 'a') {
+            if (currentSegment != null) {
+                int oldTrafficTypeIndex = currentSegment.trafficType.ordinal();
+                int trafficTypeIndex = (oldTrafficTypeIndex + 1) % TrafficType.values().length;
+                currentSegment.setTrafficType(TrafficType.values()[trafficTypeIndex]);
+                currentSegment.setButtonColor(currentSegment.buttonsTrafficTypes.get(oldTrafficTypeIndex), false);
+                currentSegment.setButtonColor(currentSegment.buttonsTrafficTypes.get(trafficTypeIndex), true);
+            }
+        } else if (key == 'A') {
+            if (currentSegment != null) {
+                int oldTrafficTypeIndex = currentSegment.trafficType.ordinal();
+                int trafficTypeIndex = oldTrafficTypeIndex - 1;
+                if (trafficTypeIndex < 0)
+                    trafficTypeIndex = TrafficType.values().length - 1;
+                currentSegment.setTrafficType(TrafficType.values()[trafficTypeIndex]);
+                currentSegment.setButtonColor(currentSegment.buttonsTrafficTypes.get(oldTrafficTypeIndex), false);
+                currentSegment.setButtonColor(currentSegment.buttonsTrafficTypes.get(trafficTypeIndex), true);
+            }
         } else if (key == 'w') {
             if (currentSegment != null) {
                 if (currentSegment.type == SegmentType.STRAIGHT) {
@@ -1029,6 +1089,7 @@ class Builder extends PComponent {
             }
         } else if (key == 'i') {
             makeIntermediateAnchors = !makeIntermediateAnchors;
+            println("Make intermediate anchors: ", makeIntermediateAnchors);
         } else if (keyString.equals("Delete")) {
             if (currentSegment != null)
                 deleteCurrentSegment();
@@ -1049,7 +1110,7 @@ class Builder extends PComponent {
     }
 
     public void mouseScrolled(int amount) {
-        if (keysPressed.contains("Ctrl")) {
+        if (keysPressed.contains("Ctrl") && sketch.mode == SimulationMode.BUILD) {
             if (amount > 0)
                 referenceImageScale *= 0.9f;
             else

@@ -1,7 +1,9 @@
 import library.core.*;
 import java.util.*;
+import java.awt.geom.Line2D;
 
-class Sensor extends PComponent implements EventIgnorer {
+class Sensor extends PComponent implements EventIgnorer, Saveable {
+    int id;
     int nodeIndexStart;
     int nodeIndexEnd;
     HashSet<Segment> segments = new HashSet<>();
@@ -16,7 +18,9 @@ class Sensor extends PComponent implements EventIgnorer {
     PVector pos;
     float length, rotation;
 
-    public Sensor(int nodeIndexStart, int nodeIndexEnd, float distanceFromEndToIntersection, Segment... segments) {
+    public Sensor(int id, int nodeIndexStart, int nodeIndexEnd, float distanceFromEndToIntersection,
+            Segment... segments) {
+        this.id = id;
         this.nodeIndexStart = nodeIndexStart;
         this.nodeIndexEnd = nodeIndexEnd;
         this.distanceFromEndToIntersection = distanceFromEndToIntersection;
@@ -39,37 +43,84 @@ class Sensor extends PComponent implements EventIgnorer {
         boolean previouslyDetected = detected;
         detected = false;
 
+        PVector sensorStart = segments.iterator().next().getNode(nodeIndexStart);
+        PVector sensorEnd = segments.iterator().next().getNode(nodeIndexEnd);
         for (RoadUser user : segments.iterator().next().builder.sketch.trafficManager.traffic) {
-            if (!segments.contains(user.currentSegment))
+            if (!segments.contains(user.currentSegment) || user.segmentReverse != reverse)
                 continue;
 
-            // We include these bounds because in real life only the start of the car has to
-            // be over the sensor so this sort of mimics that (because the nodes are close
-            // enough together that if you are at one index, the start of your vehile is
-            // probably roughly over the next one)
-            if (!reverse) {
-                if (user.targetSegmentIndex > nodeIndexStart && user.targetSegmentIndex <= nodeIndexEnd + 1) {
-                    detected = true;
-                    if (!previouslyDetected) {
-                        lastDetectedFrame = frameCount;
-                        detectedCount++;
-                    }
-                    return;
+            if (!reverse && user.targetSegmentIndex > nodeIndexEnd + 2)
+                continue;
+            if (reverse && user.targetSegmentIndex < nodeIndexEnd - 2)
+                continue;
+
+            PVector carStart = PVector.add(user.pos, PVector.fromAngle(user.heading).mult(user.length / 2));
+            PVector carEnd = PVector.add(user.pos, PVector.fromAngle(user.heading).mult(-user.length / 2));
+            if (isOverlapping(sensorStart, sensorEnd, carStart, carEnd, user.width)) {
+                detected = true;
+                if (!previouslyDetected) {
+                    lastDetectedFrame = frameCount;
+                    detectedCount++;
                 }
-            } else {
-                if (user.targetSegmentIndex < nodeIndexStart && user.targetSegmentIndex >= nodeIndexEnd - 1) {
-                    detected = true;
-                    if (!previouslyDetected) {
-                        lastDetectedFrame = frameCount;
-                        detectedCount++;
-                    }
-                    return;
-                }
+                return;
             }
         }
 
         if (previouslyDetected)
             lastDetectedFrame = frameCount;
+    }
+
+    private boolean isOverlapping(PVector sensorStart, PVector sensorEnd,
+            PVector carStart, PVector carEnd,
+            float carWidth) {
+
+        float sensorWidth = segments.iterator().next().segmentWidth;
+
+        // Direction vectors
+        float sdx = sensorEnd.x - sensorStart.x;
+        float sdy = sensorEnd.y - sensorStart.y;
+
+        float cdx = carEnd.x - carStart.x;
+        float cdy = carEnd.y - carStart.y;
+
+        // Normalize directions
+        float sl = 1.0f / sqrt(sdx * sdx + sdy * sdy);
+        float cl = 1.0f / sqrt(cdx * cdx + cdy * cdy);
+
+        sdx *= sl;
+        sdy *= sl;
+        cdx *= cl;
+        cdy *= cl;
+
+        // Four separating axes (two directions and their perpendiculars)
+        float[] axesX = { -sdy, sdx, -cdy, cdx };
+        float[] axesY = { sdx, sdy, cdx, cdy };
+
+        // Center difference
+        float dx = (carStart.x + carEnd.x - sensorStart.x - sensorEnd.x) * 0.5f;
+        float dy = (carStart.y + carEnd.y - sensorStart.y - sensorEnd.y) * 0.5f;
+
+        float sensorLength = 1.0f / sl;
+        float carLength = 1.0f / cl;
+
+        for (int i = 0; i < 4; i++) {
+            float ax = axesX[i];
+            float ay = axesY[i];
+
+            float distance = abs(dx * ax + dy * ay);
+
+            float sensorRadius = sensorLength * 0.5f * abs(sdx * ax + sdy * ay)
+                    + sensorWidth * 0.5f * abs(-sdy * ax + sdx * ay);
+
+            float carRadius = carLength * 0.5f * abs(cdx * ax + cdy * ay)
+                    + carWidth * 0.5f * abs(-cdy * ax + cdx * ay);
+
+            if (distance > sensorRadius + carRadius) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -109,5 +160,103 @@ class Sensor extends PComponent implements EventIgnorer {
     @Override
     public String toString() {
         return "Sensor (node index start/end): " + nodeIndexStart + " " + nodeIndexEnd;
+    }
+
+    public String generateSaveString() {
+        String output = "";
+
+        output += id + "\n";
+        output += nodeIndexStart + "\n";
+        output += nodeIndexEnd + "\n";
+        output += detected + "\n";
+        output += reverse + "\n";
+        output += distanceFromEndToIntersection + "\n";
+        output += pos + "\n";
+        output += length + "\n";
+        output += rotation + "\n";
+
+        output += "s";
+        output = generateSaveStringAddSegments(output, segments);
+
+        return output;
+    }
+
+    private String generateSaveStringAddSegments(String output, HashSet<Segment> segments) {
+        for (Segment segment : segments) {
+            output += segment.id + " ";
+        }
+        return output.trim() + "\n";
+    }
+
+    public static ArrayList<Sensor> loadIntersection(Sketch sketch, String pathToData) {
+        String[] data = Helper.loadStrings(pathToData);
+        if (data.length == 1)
+            return new ArrayList<>();
+        int count = 0;
+
+        ArrayList<Sensor> sensors = new ArrayList<>();
+        while (count < data.length) {
+            int id = Integer.parseInt(data[count]);
+            count++;
+
+            int nodeIndexStart = Integer.parseInt(data[count]);
+            count++;
+
+            int nodeIndexEnd = Integer.parseInt(data[count]);
+            count++;
+
+            boolean detected = Boolean.parseBoolean(data[count]);
+            count++;
+
+            boolean reverse = Boolean.parseBoolean(data[count]);
+            count++;
+
+            float distanceFromEndToIntersection = Float.parseFloat(data[count]);
+            count++;
+
+            PVector pos = PVector.parseString(data[count]);
+            count++;
+
+            float length = Float.parseFloat(data[count]);
+            count++;
+
+            float rotation = Float.parseFloat(data[count]);
+            count++;
+
+            HashSet<Segment> segments = getSegments(sketch, data[count]);
+            count++;
+
+            Sensor sensor = new Sensor(id, nodeIndexStart, nodeIndexEnd, distanceFromEndToIntersection,
+                    (Segment[]) segments.toArray(new Segment[0]));
+            sensor.setReverse(reverse);
+            sensor.pos = pos;
+            sensor.length = length;
+            sensor.rotation = rotation;
+            sensors.add(sensor);
+
+            // Increase count to skip empty line
+            count++;
+        }
+
+        return sensors;
+    }
+
+    private static HashSet<Segment> getSegments(Sketch sketch, String lineString) {
+        String[] line = lineString.substring(1).split(" ");
+        HashSet<Segment> segments = new HashSet<>();
+        for (String str : line) {
+            if (str.length() == 0)
+                continue;
+
+            int segmentID = Integer.parseInt(str);
+            for (Segment segment : sketch.builder.segments) {
+                if (segment.id == segmentID) {
+                    segments.add(segment);
+                    break;
+                }
+            }
+        }
+
+        return segments;
     }
 }

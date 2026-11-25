@@ -1,7 +1,7 @@
 import library.core.*;
 import java.util.*;
 
-class Collision {
+class Collision implements Saveable {
     PVector point;
 
     Segment entranceSegment;
@@ -27,5 +27,20 @@ class Collision {
         entranceTime = entranceDistance / entranceSegment.trafficType.getMaxSpeed();
         exitTime = exitDistance / exitSegment.trafficType.getMaxSpeed();
         clearanceTime = exitTime - entranceTime;
+    }
+
+    public String generateSaveString() {
+        String output = "";
+
+        output += point + " ";
+        output += entranceSegment.id + " ";
+        output += exitSegment.id + " ";
+        output += entranceDistance + " ";
+        output += exitDistance + " ";
+        output += entranceTime + " ";
+        output += exitTime + " ";
+        output += clearanceTime;
+
+        return output;
     }
 }

@@ -19,6 +19,9 @@ class Sketch extends Applet {
     Panel modePanel;
     ArrayList<Button> buttonsMode;
 
+    PVector translation = PVector.zero();
+    float scale = 0;
+
     public void setup() {
         size(1200, 1200);
         exitOnEscape(false);
@@ -46,11 +49,36 @@ class Sketch extends Applet {
         GameEngine.Run();
         background(27, 135, 11);
 
+        push();
+        if (mode == SimulationMode.SIMULATE) {
+            if ((scale == 0 && !mousePressed) && (translation.x != 0 || translation.y != 0)) {
+                translation.mult(0.85);
+
+                // Round the values towards 0
+                if (translation.x > 0)
+                    translation.x = floor(translation.x);
+                else
+                    translation.x = ceil(translation.x);
+                if (translation.y > 0)
+                    translation.y = floor(translation.y);
+                else
+                    translation.y = ceil(translation.y);
+            }
+
+            float zoom = 1 + scale;
+            PVector center = PVector.center();
+
+            translate(PVector.add(
+                    translation,
+                    PVector.mult(center, -scale / zoom)));
+            scale(scale);
+        }
+
         builder.update();
         builder.show();
 
         if (running && mode == SimulationMode.SIMULATE) {
-            trafficManager.update();
+            trafficManager.update(iVRI);
         }
         trafficManager.show();
 
@@ -58,6 +86,7 @@ class Sketch extends Applet {
         iVRI.update();
         iVRI.show();
 
+        pop();
         modePanel.draw();
     }
 
@@ -125,6 +154,13 @@ class Sketch extends Applet {
                         builder.currentSegment = null;
                         builder.currentAnchor = null;
                         addSegmentsToTrafficManager();
+
+                        // If the Phases button was never clicked in iVRI but there are groups, then
+                        // call the initial iVRI setup method
+                        if (iVRI.movements.size() != 0 && iVRI.segmentMovementsMap.isEmpty()) {
+                            println("Automatically \"pressing\" the Phases button");
+                            iVRI.calculateMovementDetails();
+                        }
                     }
                     for (Button b : buttonsMode) {
                         setButtonColor(b, false);
@@ -151,14 +187,113 @@ class Sketch extends Applet {
     }
 
     public void keyPressed() {
-        if (key == ' ' && !keysPressed.contains("Ctrl")) {
+        if (key == ' ' && !keysPressed.contains("Ctrl") && mode == SimulationMode.SIMULATE) {
             running = !running;
+            println("Now running:", running);
             if (running && trafficManager.segments == null) {
                 addSegmentsToTrafficManager();
             }
         } else if (key == 'f') {
             addSegmentsToTrafficManager();
+        } else if (keyString.equals("S") && keysPressed.contains("Ctrl")) {
+            saveIntersection();
+        } else if (keyString.equals("O") && keysPressed.contains("Ctrl")) {
+            loadIntersection();
         }
     }
 
+    private void saveIntersection() {
+        saveIntersectionSaveable(builder.anchors, "anchors");
+        saveIntersectionSaveable(builder.segments, "segments");
+
+        HashSet<Sensor> sensors = new HashSet<>();
+        for (Movement movement : iVRI.movements) {
+            for (int i = 0; i < movement.groups.size(); i++) {
+                sensors.addAll(movement.sensors.get(i));
+            }
+        }
+        saveIntersectionSaveable(sensors, "sensors");
+
+        saveIntersectionSaveable(iVRI.movements, "movements");
+
+        println("Saved!");
+    }
+
+    private void saveIntersectionSaveable(Collection<? extends Saveable> objects, String name) {
+        String text = "";
+        for (Saveable object : objects) {
+            text += object.generateSaveString();
+            text += "\n";
+        }
+
+        saveStrings(text.split("\n"), "intersection_data/" + name + ".txt");
+    }
+
+    private void loadIntersection() {
+        // First pass loading in segments
+        Segment.loadIntersectionFirstPass(this, "intersection_data/segments.txt");
+
+        // Full loading of anchors (possible now that segments are made)
+        Anchor.loadIntersection(this, "intersection_data/anchors.txt");
+
+        // Full loading of sensors (possible now that segments are made)
+        ArrayList<Sensor> sensors = Sensor.loadIntersection(this, "intersection_data/sensors.txt");
+
+        // Full loading of movements (possible now that segments are made)
+        Movement.loadIntersection(this, sensors, "intersection_data/movements.txt");
+
+        // Second pass loading in segments
+        Segment.loadIntersectionSecondPass(this, "intersection_data/segments.txt");
+
+        setupIVRI();
+    }
+
+    private void setupIVRI() {
+        iVRI.calculateMovementDetails();
+
+        iVRI.panelModeSwitch.delete();
+        iVRI.panelModeSwitch = null;
+        for (Button button : iVRI.buttonsMode) {
+            button.delete();
+        }
+        iVRI.buttonsMode.clear();
+        for (Panel panel : iVRI.panelsMovementNames) {
+            panel.delete();
+        }
+        iVRI.panelsMovementNames.clear();
+        for (Panel panel : iVRI.panelsMovementSegments) {
+            panel.delete();
+        }
+        iVRI.panelsMovementSegments.clear();
+        iVRI.buttonAddMovement.delete();
+        iVRI.buttonAddMovement = null;
+
+        iVRI.createPanelModeSwitch();
+        iVRI.createPanelsMovements();
+    }
+
+    public void mouseDragged() {
+        if (mouseButton == 2 && mode == SimulationMode.SIMULATE) {
+            float zoom = 1 + scale;
+            translation.add(PVector.sub(mouse, pmouse).div(zoom));
+        }
+    }
+
+    public void mouseScrolled(int amount) {
+        if (mode == SimulationMode.SIMULATE) {
+            float oldZoom = 1 + scale;
+
+            scale += amount > 0 ? -0.1f : 0.1f;
+
+            scale = max(scale, 0);
+
+            float newZoom = 1 + scale;
+
+            PVector center = PVector.center();
+            PVector mouseOffset = PVector.sub(center, mouse);
+
+            translation.add(
+                    PVector.mult(mouseOffset, 1.0f / oldZoom - 1.0f / newZoom));
+        }
+    }
 }

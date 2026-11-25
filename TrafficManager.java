@@ -12,6 +12,8 @@ public class TrafficManager extends PComponent {
 
     ArrayList<RoadUser> traffic;
 
+    boolean autoSpawnTraffic = true;
+
     public TrafficManager(Builder builder) {
         this.builder = builder;
 
@@ -51,6 +53,7 @@ public class TrafficManager extends PComponent {
 
     public RoadUser spawnTraffic() {
         ArrayList<Segment> allowableSegments = new ArrayList<Segment>();
+
         int earliestIndexAllowed = 2;
         for (Segment segment : segmentsOpeningAll) {
             boolean invalid = false;
@@ -66,17 +69,22 @@ public class TrafficManager extends PComponent {
             if (!invalid)
                 allowableSegments.add(segment);
         }
-
         if (allowableSegments.size() == 0)
             return null;
-        Segment segment = allowableSegments.get(floor(random(0, allowableSegments.size())));
-        RoadUser roadUser = new RoadUser(this, segment);
-        if (random(1) < Settings.OVSpawnChance
-                && (segment.trafficType == TrafficType.OV || segment.trafficType == TrafficType.CAR))
-            roadUser.setType(TrafficType.OV);
-        traffic.add(roadUser);
 
-        return roadUser;
+        while (true) {
+            Segment segment = allowableSegments.get(floor(random(0, allowableSegments.size())));
+            if (segment.trafficType.isVulnerable() && random(1) > Settings.vulnerableSpawnChance)
+                continue;
+
+            RoadUser roadUser = new RoadUser(this, segment);
+            if (random(1) < Settings.OVSpawnChance
+                    && (segment.trafficType == TrafficType.OV || segment.trafficType == TrafficType.CAR))
+                roadUser.setType(TrafficType.OV);
+            traffic.add(roadUser);
+
+            return roadUser;
+        }
     }
 
     public RoadUser spawnTraffic(TrafficType type) {
@@ -122,14 +130,17 @@ public class TrafficManager extends PComponent {
         return roadUser;
     }
 
-    public void update() {
-        if (random(1) < Settings.trafficSpawnInterval / 60 && traffic.size() < Settings.maxTraffic) {
-            spawnTraffic();
+    public void update(iVRI iVRI) {
+        if (autoSpawnTraffic) {
+            if (random(1) < 1.0f / (Settings.trafficSpawnInterval * 60)
+                    && traffic.size() < Settings.maxTraffic) {
+                spawnTraffic();
+            }
         }
 
         for (int i = traffic.size() - 1; i >= 0; i--) {
             RoadUser roadUser = traffic.get(i);
-            if (roadUser.update()) {
+            if (roadUser.update(iVRI)) {
                 traffic.remove(i);
                 delete(roadUser);
             }
@@ -142,38 +153,41 @@ public class TrafficManager extends PComponent {
         }
     }
 
-    // public void mouseClicked() {
-    // if (mouseButton != LEFT)
-    // return;
-    //
-    // if (builder.currentSegment == null && builder.currentAnchor == null &&
-    // segments != null) {
-    // Segment segment = builder.getHoveredSegment();
-    // if (segment == null)
-    // return;
-    //
-    // PVector closestNode = null;
-    // float closestDistance = Float.MAX_VALUE;
-    // int closestIndex = -1;
-    // for (int i = 0; i < segment.path.size(); i++) {
-    // PVector node = segment.path.get(i);
-    // float distance = PVector.dist(mouse, node);
-    // if (distance < closestDistance) {
-    // closestDistance = distance;
-    // closestNode = node;
-    // closestIndex = i;
-    // }
-    // }
-    //
-    // RoadUser roadUser = new RoadUser(this, segment);
-    // roadUser.targetSegmentIndex = closestIndex + 1;
-    // roadUser.pos = closestNode.copy();
-    // roadUser.heading = PVector.sub(segment.getNode(closestIndex + 1),
-    // segment.getNode(closestIndex - 1))
-    // .heading();
-    // roadUser.speed = 0;
-    //
-    // traffic.add(roadUser);
-    // }
-    // }
+    public void mouseClicked() {
+        if (mouseButton != LEFT)
+            return;
+
+        if (autoSpawnTraffic)
+            return;
+
+        if (builder.currentSegment == null && builder.currentAnchor == null &&
+                segments != null) {
+            Segment segment = builder.getHoveredSegment();
+            if (segment == null)
+                return;
+
+            PVector closestNode = null;
+            float closestDistance = Float.MAX_VALUE;
+            int closestIndex = -1;
+            for (int i = 0; i < segment.path.size(); i++) {
+                PVector node = segment.path.get(i);
+                float distance = PVector.dist(mouse, node);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestNode = node;
+                    closestIndex = i;
+                }
+            }
+
+            RoadUser roadUser = new RoadUser(this, segment);
+            roadUser.targetSegmentIndex = closestIndex + 1;
+            roadUser.pos = closestNode.copy();
+            roadUser.heading = PVector.sub(segment.getNode(closestIndex + 1),
+                    segment.getNode(closestIndex - 1))
+                    .heading();
+            roadUser.speed = 0;
+
+            traffic.add(roadUser);
+        }
+    }
 }

@@ -2,8 +2,9 @@ import library.core.*;
 import GameEngine.*;
 import java.util.*;
 
-class Segment extends PComponent {
+class Segment extends PComponent implements Saveable {
     Builder builder;
+    iVRI iVRI = null;
 
     int id;
 
@@ -74,6 +75,10 @@ class Segment extends PComponent {
     }
 
     private Segment(Builder builder, PVector pos, TrafficType trafficType, int id) {
+        this(builder, pos, trafficType, id, true);
+    }
+
+    private Segment(Builder builder, PVector pos, TrafficType trafficType, int id, boolean createEditorPanel) {
         this.builder = builder;
         this.id = id;
         type = SegmentType.STRAIGHT;
@@ -89,7 +94,12 @@ class Segment extends PComponent {
         openingSegment = false;
         closingSegment = false;
 
-        createEditorPanel();
+        if (createEditorPanel)
+            createEditorPanel();
+    }
+
+    public void setIVRI(iVRI iVRI) {
+        this.iVRI = iVRI;
     }
 
     private void createEditorPanel() {
@@ -474,7 +484,7 @@ class Segment extends PComponent {
         segmentEditorPanel.addElementFromTop(buttonTypeBezier, false);
     }
 
-    private void setButtonColor(Button button, boolean active) {
+    public void setButtonColor(Button button, boolean active) {
         if (active) {
             button.setDefaultColor(Settings.buttonAccentDefault);
             button.setHoverColor(Settings.buttonAccentHover);
@@ -652,9 +662,17 @@ class Segment extends PComponent {
         }
         // drawMarkings();
 
-        fill(segmentColor);
-        noStroke();
-        drawPath(path);
+        if (builder.drawRoads) {
+            fill(segmentColor);
+            // Draw OV lanes with car color in intersections. However if the segment has a
+            // custom color, still use it
+            if (trafficType == TrafficType.OV && segmentColor == Settings.segmentColorOV && iVRI != null) {
+                fill(Settings.segmentColorCar);
+            }
+            noStroke();
+            if (!(trafficType == TrafficType.MEDIAN && builder.sketch.mode == SimulationMode.SIMULATE))
+                drawPath(path);
+        }
 
         // drawPathPoints();
         // drawID();
@@ -791,10 +809,15 @@ class Segment extends PComponent {
     }
 
     public void drawPathPoints() {
-        for (PVector point : path) {
-            fill(0);
-            noStroke();
-            circle(point, Settings.sizeAnchor / 1.5);
+        // for (PVector point : path) {
+        // fill(0);
+        // noStroke();
+        // circle(point, Settings.sizeAnchor / 1.5);
+        // }
+        textSize(15);
+        fill(0);
+        for (int i = 0; i < path.size(); i++) {
+            text(i, path.get(i));
         }
 
         // // Draw left and right snaps
@@ -1104,7 +1127,7 @@ class Segment extends PComponent {
                 setPriority(Settings.segmentPriorityPedestrian);
                 break;
             case MEDIAN:
-                segmentWidth = Settings.segmentWidthPedestrian;
+                segmentWidth = Settings.segmentWidthMedian;
                 segmentColor = Settings.segmentColorPedestrian;
                 setPriority(1);
                 break;
@@ -1463,5 +1486,218 @@ class Segment extends PComponent {
         copy.inputFieldSegmentPriority.setText(String.valueOf(copy.priority));
 
         return copy;
+    }
+
+    public String generateSaveString() {
+        String output = "";
+
+        output += id + "\n";
+        output += type.toString() + "\n";
+        output += start.toString() + "\n";
+        output += end.toString() + "\n";
+        output += startHeading + "\n";
+        output += endHeading + "\n";
+        output += startControlPointMag + "\n";
+        output += endControlPointMag + "\n";
+        output += trafficType.toString() + "\n";
+        output += segmentWidth + "\n";
+        output += segmentColor + "\n";
+        output += priority + "\n";
+        output += openingSegment + "\n";
+        output += closingSegment + "\n";
+
+        output += startAnchor.id + "\n";
+        output += endAnchor.id + "\n";
+
+        output = generateSaveStringAddSegments(output, segmentsPrevious, "p");
+        output = generateSaveStringAddSegments(output, segmentsNext, "n");
+        output = generateSaveStringAddSegments(output, segmentsNextOptions, "o");
+        output = generateSaveStringAddSegments(output, snappedToSegments, "s");
+
+        output = generateSaveStringAddSegments(output, controlledSegments, "a");
+        output = generateSaveStringAddSegments(output, controlledLeftStart, "b");
+        output = generateSaveStringAddSegments(output, controlledRightStart, "c");
+        output = generateSaveStringAddSegments(output, controlledLeftEnd, "d");
+        output = generateSaveStringAddSegments(output, controlledRightEnd, "e");
+        output = generateSaveStringAddSegments(output, controlledFullLeft, "f");
+        output = generateSaveStringAddSegments(output, controlledFullRight, "g");
+
+        return output;
+    }
+
+    private String generateSaveStringAddSegments(String output, HashSet<Segment> segments, String prefix) {
+        output += prefix;
+        for (Segment segment : segments) {
+            output += segment.id + " ";
+        }
+        return output.trim() + "\n";
+    }
+
+    public static void loadIntersectionFirstPass(Sketch sketch, String pathToData) {
+        String[] data = Helper.loadStrings(pathToData);
+        int count = 0;
+
+        while (count < data.length) {
+            int id = Integer.parseInt(data[count]);
+            count++;
+
+            SegmentType type = SegmentType.valueOf(data[count]);
+            count++;
+
+            PVector start = PVector.parseString(data[count]);
+            count++;
+
+            PVector end = PVector.parseString(data[count]);
+            count++;
+
+            float startHeading = Float.parseFloat(data[count]);
+            count++;
+
+            float endHeading = Float.parseFloat(data[count]);
+            count++;
+
+            float startControlPointMag = Float.parseFloat(data[count]);
+            count++;
+
+            float endControlPointMag = Float.parseFloat(data[count]);
+            count++;
+
+            TrafficType trafficType = TrafficType.valueOf(data[count]);
+            count++;
+
+            float segmentWidth = Float.parseFloat(data[count]);
+            count++;
+
+            color segmentColor = new color(data[count]);
+            count++;
+
+            int priority = Integer.parseInt(data[count]);
+            count++;
+
+            boolean openingSegment = Boolean.parseBoolean(data[count]);
+            count++;
+
+            boolean closingSegment = Boolean.parseBoolean(data[count]);
+            count++;
+
+            Segment segment = new Segment(sketch.builder, start, trafficType, id, false);
+            segment.type = type;
+            segment.start = start;
+            segment.end = end;
+            segment.startHeading = startHeading;
+            segment.endHeading = endHeading;
+            segment.startControlPointMag = startControlPointMag;
+            segment.endControlPointMag = endControlPointMag;
+            segment.trafficType = trafficType;
+            segment.segmentWidth = segmentWidth;
+            segment.segmentColor = segmentColor;
+            segment.priority = priority;
+            segment.openingSegment = openingSegment;
+            segment.closingSegment = closingSegment;
+
+            segment.updatePath();
+
+            sketch.builder.segments.add(segment);
+            sketch.builder.segmentID = Math.max(sketch.builder.segmentID, segment.id + 1);
+
+            // Find next segment
+            while (data[count].length() != 0) {
+                count++;
+                if (count == data.length)
+                    break;
+            }
+            count++;
+        }
+    }
+
+    public static void loadIntersectionSecondPass(Sketch sketch, String pathToData) {
+        String[] data = Helper.loadStrings(pathToData);
+        int count = 0;
+        int index = 0;
+
+        while (count < data.length) {
+            while (!data[count].startsWith("p")) {
+                count++;
+            }
+            count -= 2;
+
+            Segment segment = sketch.builder.segments.get(index);
+
+            segment.startAnchor = findAnchor(sketch, Integer.parseInt(data[count]));
+            count++;
+
+            segment.endAnchor = findAnchor(sketch, Integer.parseInt(data[count]));
+            count++;
+
+            segment.segmentsPrevious.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.segmentsNext.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.segmentsNextOptions.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.snappedToSegments.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.controlledSegments.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.controlledLeftStart.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.controlledRightStart.addAll(getSegments(sketch, data[count]));
+            count++;
+            count++;
+
+            segment.controlledRightEnd.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.controlledFullLeft.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.controlledFullRight.addAll(getSegments(sketch, data[count]));
+            count++;
+
+            segment.createEditorPanel();
+
+            count++;
+            index++;
+        }
+    }
+
+    private static Anchor findAnchor(Sketch sketch, int id) {
+        for (Anchor anchor : sketch.builder.anchors) {
+            if (anchor.id == id) {
+                return anchor;
+            }
+        }
+        System.err.println("Couldn't find segment in Movement.findAnchor for id " + id);
+        return null;
+    }
+
+    private static Segment findSegment(Sketch sketch, int id) {
+        for (Segment segment : sketch.builder.segments) {
+            if (segment.id == id) {
+                return segment;
+            }
+        }
+        System.err.println("Couldn't find segment in Movement.findSegment for id " + id);
+        return null;
+    }
+
+    private static ArrayList<Segment> getSegments(Sketch sketch, String lineString) {
+        String[] line = lineString.substring(1).split(" ");
+        ArrayList<Segment> segments = new ArrayList<>();
+        for (String str : line) {
+            if (str.length() == 0)
+                continue;
+
+            int segmentID = Integer.parseInt(str);
+            segments.add(findSegment(sketch, segmentID));
+        }
+
+        return segments;
     }
 }

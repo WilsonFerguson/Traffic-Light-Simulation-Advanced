@@ -28,7 +28,7 @@ class Cursor extends PComponent {
      * Left/right snapping, anchor snapping, wall snapping, 90 snapping, heading
      * snapping, guidelines snapping, middle segment, middle wall
      */
-    boolean[] enabledSnappingOptions = { true, true, true, true, true, true, true, true };
+    boolean[] enabledSnappingOptions = { true, true, true, true, true, false, true, true };
 
     boolean fixedX = false;
     boolean fixedY = false;
@@ -38,8 +38,9 @@ class Cursor extends PComponent {
     Anchor draggedAnchor = null;
 
     float epsilon = 0.0001f;
-    float radianMargin = 0.1f;
+    float radianMargin = 0.05f;
     float pixelMargin = 15;
+    float pixelMarginWalls = 30;
 
     public Cursor(Builder builder) {
         this.builder = builder;
@@ -184,20 +185,20 @@ class Cursor extends PComponent {
     }
 
     private boolean snapWalls() {
-        if (mouseX < pixelMargin) {
+        if (mouseX < pixelMarginWalls) {
             pos.x = 0;
             snappingWall = true;
             fixedX = true;
-        } else if (mouseX > width - pixelMargin) {
+        } else if (mouseX > width - pixelMarginWalls) {
             pos.x = width;
             snappingWall = true;
             fixedX = true;
         }
-        if (mouseY < pixelMargin) {
+        if (mouseY < pixelMarginWalls) {
             pos.y = 0;
             snappingWall = true;
             fixedY = true;
-        } else if (mouseY > height - pixelMargin) {
+        } else if (mouseY > height - pixelMarginWalls) {
             pos.y = height;
             snappingWall = true;
             fixedY = true;
@@ -544,16 +545,14 @@ class Cursor extends PComponent {
     }
 
     public void mousePressed() {
-        if (mouseButton != LEFT)
-            return;
-        if (builder.currentSegment != null && builder.segmentPlaced) {
+        if (builder.currentSegment != null && builder.segmentPlaced && mouseButton == LEFT) {
             if (pos.dist(builder.currentSegment.getStartControlPoint()) < Settings.sizeAnchor / 2) {
                 selectedStartControlPoint = builder.currentSegment;
             } else if (pos.dist(builder.currentSegment.getEndControlPoint()) < Settings.sizeAnchor / 2) {
                 selectedEndControlPoint = builder.currentSegment;
             }
         }
-        if (builder.currentSegment == null && builder.currentAnchor == null) {
+        if (builder.currentSegment == null && builder.currentAnchor == null && mouseButton == 2) {
             draggedAnchor = builder.getHoveredAnchor();
         }
     }

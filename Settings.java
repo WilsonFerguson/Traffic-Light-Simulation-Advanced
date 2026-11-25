@@ -8,15 +8,23 @@ class Settings extends PFunctions {
     /**
      * Statistically, how many seconds between each spawn of a road user.
      */
-    public static float trafficSpawnInterval = 1f;
+    public static float trafficSpawnInterval = 2.5f;
     public static int maxTraffic = 100;
-    public static float OVSpawnChance = 0.05f;
+    public static float OVSpawnChance = 0.065f;
+    /**
+     * Chance that if a vulnerable user was chosen to spawn that it will actually go
+     * ahead with it instead of rerolling. If this is 0 then vulnerable users will
+     * never spawn, if it's 1 then they will never get rerolled (and thereby have
+     * the same spawn chance as cars)
+     */
+    public static float vulnerableSpawnChance = 0.6f;
 
     public static float sizeAnchor = 1.5f * pixelsPerMeter;
     public static float segmentWidthCar = 3 * pixelsPerMeter;
     public static float segmentWidthBike1Way = 2 * pixelsPerMeter;
     public static float segmentWidthBike2Way = 4 * pixelsPerMeter;
     public static float segmentWidthPedestrian = 2 * pixelsPerMeter;
+    public static float segmentWidthMedian = 1 * pixelsPerMeter;
     /**
      * Multiplier when drawing the segments to remove the awkward green space that
      * sometimes occurs between segments.
@@ -50,7 +58,13 @@ class Settings extends PFunctions {
 
     public static float reactionTime = 1;
     public static float turningRate = 0.08f;
-    public static float distanceToNodeThreshold = 2f * pixelsPerMeter;
+    public static float distanceToNodeThreshold = 1.8f * pixelsPerMeter;
+    /*
+     * If the light is yellow, how long (as a percentage of the total time) could it
+     * be yellow for and for people to still go through it. If the yellow has been
+     * longer than this percentage, then people won't go
+     */
+    public static float percentageOfYellowToStillGo = 0.8f;
 
     public static float variationAcceleration = 0.22f;
     public static float variationMaxSpeed = 0.22f;
@@ -60,17 +74,27 @@ class Settings extends PFunctions {
     public static float greenTimeMinimum = 4f;
     public static float redTimeMinimum = 1f;
 
-    public static color lightGreen = new color(36, 156, 42);
-    public static color lightYellow = new color(207, 176, 54);
-    public static color lightRed = new color(189, 57, 47);
+    public static color lightGreen = new color(0, 135, 84);
+    public static color lightYellow = new color(247, 181, 0);
+    public static color lightRed = new color(187, 30, 16);
+    /**
+     * The opacity of the traffic lights when they aren't on
+     */
+    public static int lightOffAlpha = 10;
     /**
      * How many frames in between each toggle of on or off of the pedestrian light.
      */
     public static int lightPedestrianFlashInterval = 17;
 
-    public static int weightsDetectedCount = 5;
+    public static int weightsDetectedCount = 4;
     public static int weightsWaitTime = 2;
+    /**
+     * The idea for making this one the same value as weightsWaitTime is because
+     * both are just about literally waiting for x number of seconds before a green
+     */
+    public static int weightsTimeUntilGreen = 2;
     public static int weightsQueueSensor = 21;
+
     public static int noDetectionTime = 1 * 60;
 
     public static color controlPointColor = new color(173, 68, 199);

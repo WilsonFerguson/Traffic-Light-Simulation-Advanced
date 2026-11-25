@@ -1,11 +1,12 @@
 import library.core.*;
 import java.util.*;
 
-class RoadUser extends PComponent {
+class RoadUser extends PComponent implements EventIgnorer {
     TrafficManager trafficManager;
     PVector pos;
     float heading;
     float speed;
+    boolean stopping = false;
 
     TrafficType type;
     boolean ovExclusive;
@@ -80,8 +81,8 @@ class RoadUser extends PComponent {
         dt = 1 / frameRate;
     }
 
-    public boolean update() {
-        move();
+    public boolean update(iVRI iVRI) {
+        move(iVRI);
 
         boolean done = advanceSegment();
 
@@ -98,11 +99,14 @@ class RoadUser extends PComponent {
         push();
         translate(pos);
         rotate(heading);
-        rect(0, 0, length, width);
+        if (type == TrafficType.PEDESTRIAN)
+            circle(0, 0, length);
+        else
+            rect(0, 0, length, width);
         pop();
     }
 
-    private void move() {
+    private void move(iVRI iVRI) {
         // Target speed will be based on how far off the heading we are
         PVector targetNode = getOffsetNode(targetSegmentIndex);
         PVector toTarget = PVector.sub(targetNode, pos);
@@ -116,6 +120,8 @@ class RoadUser extends PComponent {
         int accelerationDirection = targetSpeed > speed ? 1 : -1;
         float appliedAcceleration = acceleration * accelerationDirection;
 
+        stopping = false;
+
         appliedAcceleration = min(appliedAcceleration, stopForCarsInFront());
         float a = yieldRightOfWay(appliedAcceleration);
         if (a == Float.MIN_VALUE)
@@ -127,12 +133,18 @@ class RoadUser extends PComponent {
         // AND: consider the width of the segment for determining where to stop
 
         // TODO: stopping at red lights
+        appliedAcceleration = min(appliedAcceleration, stopForTrafficLight(iVRI));
 
+        dt = 1 / frameRate;
         speed += appliedAcceleration * dt;
         if (speed > maxSpeed)
             speed = maxSpeed;
         else if (speed < 0)
             speed = 0;
+        if (stopping) {
+            if (speed < 0.1)
+                speed = 0;
+        }
 
         heading += targetHeadingDeviation * Settings.turningRate;
         pos.add(PVector.fromAngle(heading).setMag(speed * dt));
@@ -218,12 +230,15 @@ class RoadUser extends PComponent {
                 }
             }
         }
-        // x second following distance
-        if (closestVehicle < speed * 2 || closestVehicle < length / 3) {
+
+        // The following distance we want is some number of seconds * our speed
+        float followingDistance = speed * 2;
+        if (closestVehicle < followingDistance || closestVehicle < length / 3) {
             // float targetDistance = closestVehicle - closestVehicleRoadUser.speed * 2;
             float targetDistance = closestVehicle - length / 3;
             float a = pow(speed, 2) / (2 * targetDistance);
-            // appliedAcceleration = min(appliedAcceleration, -abs(a));
+
+            stopping = true;
             return -abs(a);
         }
         return Float.MAX_VALUE;
@@ -307,6 +322,7 @@ class RoadUser extends PComponent {
                             / pow(theirTimeToIntersection, 2);
                     // float a = pow(speed, 2) / (2 * (distanceToIntersection - length));
 
+                    stopping = true;
                     return -abs(a);
                 }
 
@@ -318,9 +334,83 @@ class RoadUser extends PComponent {
         return Float.MAX_VALUE;
     }
 
+    /*
+     * Stops for both yellows (assuming the light hasn't been yellow for too long)
+     * and red lights
+     */
+    private float stopForTrafficLight(iVRI iVRI) {
+        Movement movement = iVRI.getMovement(currentSegment);
+        if (movement == null)
+            return Float.MAX_VALUE;
+
+        // Conceptually groups.size() should always be 1 I think, so the below for loops
+        // aren't really necessary but we do it to be complete
+        HashSet<Integer> groups = iVRI.getGroups(currentSegment);
+        Signal signal = null;
+
+        // Here we will just use the first index in the group because it's easier in
+        // order to find the kopLus
+        int index = groups.iterator().next();
+        Sensor kopLus = null;
+        if (segmentReverse)
+            kopLus = movement.sensors.get(index).get(movement.sensorReverseStartIndices.get(index));
+        else
+            kopLus = movement.sensors.get(index).get(0);
+
+        if ((segmentReverse && targetSegmentIndex < kopLus.nodeIndexEnd)
+                || (!segmentReverse && targetSegmentIndex > kopLus.nodeIndexEnd))
+            return Float.MAX_VALUE;
+
+        float yellowSoFar = 0;
+        // We look at pedestrians specifically because they would look at either reverse
+        // or normal signal (because those signals in real life should always be equal,
+        // even though in the backend code here they aren't)
+        if (type == TrafficType.PEDESTRIAN) {
+            for (int i : groups) {
+                Signal signal1 = movement.signals.get(i).getNormal();
+                Signal signal2 = movement.signals.get(i).getReverse();
+                Signal groupSignal = Signal.compareSignalsTowardsTarget(signal1, signal2, Signal.GREEN);
+                signal = Signal.compareSignalsTowardsTarget(signal, groupSignal, Signal.GREEN);
+                if (signal == Signal.GREEN)
+                    break;
+            }
+        } else {
+            for (int i : groups) {
+                Signal groupSignal = movement.signals.get(i).get(segmentReverse);
+                signal = Signal.compareSignalsTowardsTarget(signal, groupSignal, Signal.RED);
+                if (signal == Signal.RED)
+                    break;
+
+                if (groupSignal == Signal.YELLOW) {
+                    yellowSoFar = max(yellowSoFar, frameCount - movement.signalStartTimes.get(i).get(segmentReverse));
+                }
+            }
+        }
+
+        if (signal == Signal.GREEN)
+            return Float.MAX_VALUE;
+        if (signal == Signal.YELLOW && type != TrafficType.PEDESTRIAN
+                && yellowSoFar <= Settings.yellowTime * frameRate * Settings.percentageOfYellowToStillGo)
+            return Float.MAX_VALUE;
+
+        // So it's either been yellow for too long or it's red, so we have to stop
+        float stoppingDistance = PVector.add(pos, PVector.fromAngle(heading).mult(1.2 * length / 2))
+                .dist(getOffsetNode(kopLus.nodeIndexEnd));
+
+        // If we are close enough then we can start slowing down (within __ seconds)
+        float threshold = speed * 4;
+        // We are not right at the light and we are greater than threshold
+        if (stoppingDistance > length / 2 && stoppingDistance > threshold)
+            return Float.MAX_VALUE;
+
+        float a = pow(speed, 2) / (2 * stoppingDistance);
+        stopping = true;
+        return -abs(a);
+    }
+
     private boolean advanceSegment() {
-        float dist = pos.dist(currentSegment.getNode(targetSegmentIndex));
-        if (dist > Settings.distanceToNodeThreshold)
+        float dist = pos.dist(getOffsetNode(targetSegmentIndex));
+        if (dist > length / 5)
             return false;
 
         if (segmentReverse) {
@@ -345,9 +435,11 @@ class RoadUser extends PComponent {
                 return true;
             if (segmentReverse && currentSegment.openingSegment)
                 return true;
-            throw new RuntimeException(
-                    "Cannot continue because there is no new segment and my current segment is not a closing segment. Position: "
+
+            System.err.println(
+                    "ERROR! Cannot continue because there is no new segment and my current segment is not a closing segment (so this road user will be deleted). Position: "
                             + pos.toString() + ", traffic type " + type + ", reverse segment " + segmentReverse);
+            return true;
         }
 
         int index = floor(random(0, potentialNextSegments.size()));
@@ -369,13 +461,15 @@ class RoadUser extends PComponent {
     }
 
     private ArrayList<Segment> findCandidates() {
-        HashSet<Segment> options = currentSegment.segmentsNextOptions;
+        HashSet<Segment> options;
         if (segmentReverse) {
-            // options = currentSegment.segmentsPrevious;
+            options = new HashSet<>();
             for (Segment segment : currentSegment.segmentsPrevious) {
                 if (segment.segmentsNextOptions.contains(currentSegment))
                     options.add(segment);
             }
+        } else {
+            options = currentSegment.segmentsNextOptions;
         }
         ArrayList<Segment> candidates = new ArrayList<Segment>();
 
@@ -448,14 +542,14 @@ class RoadUser extends PComponent {
     }
 
     private void refineCandidatesBikes(ArrayList<Segment> candidates) {
-        if (!(type == TrafficType.BIKE_1WAY || type == TrafficType.BIKE_2WAY))
+        if (!type.isBike())
             return;
 
         // If there are any segments that are bikes, that we remove all non-bike
         // segments
         boolean hasBike = false;
         for (Segment segment : candidates) {
-            if (segment.trafficType == TrafficType.BIKE_1WAY || segment.trafficType == TrafficType.BIKE_2WAY) {
+            if (segment.trafficType.isBike()) {
                 hasBike = true;
                 break;
             }
@@ -464,7 +558,7 @@ class RoadUser extends PComponent {
         if (hasBike) {
             for (int i = candidates.size() - 1; i >= 0; i--) {
                 Segment segment = candidates.get(i);
-                if (segment.trafficType != TrafficType.BIKE_1WAY && segment.trafficType != TrafficType.BIKE_2WAY) {
+                if (!segment.trafficType.isBike()) {
                     candidates.remove(segment);
                 }
             }
