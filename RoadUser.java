@@ -93,6 +93,8 @@ class RoadUser extends PComponent implements EventIgnorer {
         fill(255, 150);
         if (type == TrafficType.OV)
             fill(Settings.buttonAccentDefault);
+        // stroke(0);
+        // strokeWeight(1);
         noStroke();
         rectMode(CENTER);
 

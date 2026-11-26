@@ -481,15 +481,15 @@ public class Applet extends JPanel implements PConstants, Runnable {
 
     protected void mouseRelease(MouseEvent evt) {
         mousePressed = false;
-        mouseButton = CENTER;
-
         PComponent.mousePressed = false;
-        PComponent.mouseButton = CENTER;
 
         mouseReleased();
         for (int i = 0; i < PComponent.components.size(); i++) {
             PComponent.components.get(i).mouseReleased();
         }
+
+        mouseButton = CENTER;
+        PComponent.mouseButton = CENTER;
         // Iterator<PComponent> itr = PComponent.components.iterator();
         // while (itr.hasNext()) {
         // itr.next().mouseReleased();

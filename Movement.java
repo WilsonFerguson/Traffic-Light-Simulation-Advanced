@@ -9,7 +9,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
     Sketch sketch;
     Builder builder;
 
-    ArrayList<Segment> allMovements;
+    ArrayList<Segment> allMovements = new ArrayList<>();
     ArrayList<ArrayList<Segment>> groups = new ArrayList<>();
 
     ArrayList<Float> delays = null;
@@ -27,6 +27,12 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
      * there is no entry into this map
      */
     HashMap<Integer, Integer> sensorReverseStartIndices = new HashMap<>();
+
+    /**
+     * Whether this pedestrian signal uses radar to extend greens (aka just using
+     * the koplus sensor for extensions)
+     */
+    boolean useRadar = false;
 
     HashMap<Integer, SignalGroup> signals = new HashMap<>();
     /**
@@ -107,6 +113,12 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         if (sensors != null) {
             for (int key : sensors.keySet()) {
                 for (Sensor sensor : sensors.get(key)) {
+                    if (sensor.type == SensorType.HEAD && signals.get(key).get(sensor.reverse) == Signal.RED
+                            && frameCount
+                                    - signalStartTimes.get(key).get(sensor.reverse) < round(
+                                            Settings.minimumRedTimeBeforeDetection * frameRate))
+                        continue;
+
                     sensor.detect();
                 }
             }
@@ -376,10 +388,8 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
             // signalsNext.get(index) exists so we don't need to check
             signalsNext.get(index).set(Signal.RED, reverse);
             signalNextStartTimes.get(index).set(frameCount + round(Settings.yellowTime * frameRate), reverse);
-
-            // We also reset the sensor detectedCounts
-            // TODO: hmm this might not be the best time to reset. Maybe when we actually
-            // turn red should we reset it but I'm not quite sure
+        } else if (signals.get(index).get(reverse) == Signal.RED) {
+            // We reset the sensor detectedCounts
             for (Sensor sensor : sensors.get(index)) {
                 if (sensor.reverse == reverse)
                     sensor.resetCount();
@@ -391,6 +401,24 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         this.mustWait = mustWait;
     }
 
+    public boolean isPedestrian() {
+        if (groups.isEmpty())
+            return false;
+        if (groups.getFirst().size() == 0)
+            return false;
+
+        return groups.getFirst().getFirst().trafficType == TrafficType.PEDESTRIAN;
+    }
+
+    public Sensor getSensor(SensorType type, int group, boolean reverse) {
+        for (Sensor sensor : sensors.get(group)) {
+            if (sensor.type == type && sensor.reverse == reverse)
+                return sensor;
+        }
+
+        return null;
+    }
+
     public void calculateDetailsStart() {
         // Remove any empty groups
         for (int i = groups.size() - 1; i >= 0; i--) {
@@ -399,12 +427,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
             }
         }
 
-        allMovements = new ArrayList<>();
-        for (ArrayList<Segment> group : groups) {
-            for (Segment segment : group) {
-                allMovements.add(segment);
-            }
-        }
+        populateAllMovements();
 
         calculateVulnerableOnly();
         calculateEntranceNodes();
@@ -414,6 +437,16 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         calculateDelays();
         calculateClearanceTimes();
         calculateSensors();
+    }
+
+    public void populateAllMovements() {
+        allMovements = new ArrayList<>();
+        for (ArrayList<Segment> group : groups) {
+            for (Segment segment : group) {
+                allMovements.add(segment);
+            }
+        }
+
     }
 
     public void calculateVulnerableOnly() {
@@ -486,9 +519,9 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         } else {
             if (minimumIndex != Integer.MAX_VALUE) {
                 if (minimumIndex == 0)
-                    System.err
-                            .println("Warning! minimumIndex = 0 in Movement.calculateEntranceNode(). ID, group index: "
-                                    + id + ", " + index);
+                    System.err.println(
+                            "Warning! minimumIndex = 0 in Movement.calculateEntranceNode(). ID, name, group index: "
+                                    + id + ", " + name + ", " + index);
                 return minimumIndex - 1;
             } else {
                 return 0;
@@ -707,7 +740,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         int start = 0;
         int end = 1;
         Segment[] segments = groups.get(index).toArray(new Segment[0]);
-        sensors.get(index).add(createSensor(start, end, 0, segments));
+        sensors.get(index).add(createSensor(SensorType.HEAD, start, end, 0, segments));
 
         if (segments[0].segmentsPrevious.size() != 1)
             return;
@@ -728,7 +761,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                 start = 0;
                 end = 1;
             }
-            sensors.get(arrayIndex).add(createSensor(start, end, 0, segment));
+            sensors.get(arrayIndex).add(createSensor(SensorType.HEAD, start, end, 0, segment));
         }
 
         // The queue sensor should end approximately 8m before the start of the
@@ -775,7 +808,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
             // nextStart + 1 is just the end of the kopLus (because it has a length of 1
             // node)
             distance += Settings.distanceToNodeThreshold * (nextStart + 1 - end);
-        sensors.get(arrayIndex).add(createSensor(start, end, distance, segment));
+        sensors.get(arrayIndex).add(createSensor(SensorType.QUEUE, start, end, distance, segment));
 
         // The farthest out sensor should be another 50m from the start of the queue
         // sensor
@@ -788,7 +821,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         end = max(end, 2);
         start = end - 1;
         distance += Settings.distanceToNodeThreshold * (previousEnd - end);
-        sensors.get(arrayIndex).add(createSensor(start, end, distance, segment));
+        sensors.get(arrayIndex).add(createSensor(SensorType.FAR, start, end, distance, segment));
     }
 
     private void makeBikeSensors(int index, boolean reverse) {
@@ -819,7 +852,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                 start = min(start, segment.path.size() - 1);
                 int end = start - 1;
                 distance += Settings.distanceToNodeThreshold * (end - nextStart);
-                Sensor sensor = createSensor(start, end, distance, segment);
+                Sensor sensor = createSensor(SensorType.FAR, start, end, distance, segment);
                 sensor.setReverse(true);
                 sensors.get(index).add(sensor);
             } else {
@@ -857,7 +890,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                     // node)
                     distance += Settings.distanceToNodeThreshold * (nextStart + 1 - end);
 
-                sensors.get(index).add(createSensor(start, end, distance, segment));
+                sensors.get(index).add(createSensor(SensorType.FAR, start, end, distance, segment));
             } else {
                 // TODO: do
                 throw new UnsupportedOperationException();
@@ -878,7 +911,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                     start = groups.get(index).get(0).path.size() - 1;
                     end = start - 1;
                 }
-                Sensor sensor = createSensor(start, end, 0, groups.get(index).get(0));
+                Sensor sensor = createSensor(SensorType.HEAD, start, end, 0, groups.get(index).get(0));
                 sensor.setReverse(true);
                 sensors.get(index).add(sensor);
                 sensorReverseStartIndices.put(index, sensors.get(index).size() - 1);
@@ -895,21 +928,22 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                     start = 0;
                     end = 1;
                 }
-                sensors.get(index).add(createSensor(start, end, 0, groups.get(index).get(0)));
+                sensors.get(index).add(createSensor(SensorType.HEAD, start, end, 0, groups.get(index).get(0)));
                 return start;
             } else {
                 int start = 0;
                 int end = 1;
                 Segment[] segments = groups.get(index).toArray(new Segment[0]);
-                sensors.get(index).add(createSensor(start, end, 0, segments));
+                sensors.get(index).add(createSensor(SensorType.HEAD, start, end, 0, segments));
                 return start;
             }
         }
     }
 
-    private Sensor createSensor(int nodeIndexStart, int nodeIndexEnd, float distanceFromEndToIntersection,
+    private Sensor createSensor(SensorType type, int nodeIndexStart, int nodeIndexEnd,
+            float distanceFromEndToIntersection,
             Segment... segments) {
-        Sensor sensor = new Sensor(iVRI.sensorID, nodeIndexStart, nodeIndexEnd, distanceFromEndToIntersection,
+        Sensor sensor = new Sensor(iVRI.sensorID, type, nodeIndexStart, nodeIndexEnd, distanceFromEndToIntersection,
                 segments);
         iVRI.sensorID++;
         return sensor;

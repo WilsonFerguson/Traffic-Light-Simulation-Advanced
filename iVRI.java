@@ -28,6 +28,10 @@ class iVRI extends PComponent {
     Movement editingMovement;
     int editingMovementGroupIndex;
 
+    Movement toDeleteMovement = null;
+    Panel toDeleteMovementsPanel = null;
+    boolean previousMousePressed = false;
+
     private enum EditingMode {
         MOVEMENTS, PHASES
     }
@@ -131,6 +135,17 @@ class iVRI extends PComponent {
                 }
             }
         }
+
+        // Deleting of movements (super hacky because somehow every onClick and
+        // onMouseReleased would be triggered like in a row causing mass deletions)
+        if (previousMousePressed != mousePressed && mousePressed) {
+            if (toDeleteMovement != null) {
+                deleteMovement(toDeleteMovement, toDeleteMovementsPanel);
+                toDeleteMovement = null;
+                toDeleteMovementsPanel = null;
+            }
+        }
+        previousMousePressed = mousePressed;
     }
 
     private void controlTrafficLight() {
@@ -225,30 +240,15 @@ class iVRI extends PComponent {
         Option<Integer> timeUntilGreen = new Option<>(movement.getEarliestGreenStartTime(i, reverse) - frameCount);
 
         Option<Integer> detectedCount = new Option<>();
-        if (movement.sensors.get(i).size() >= 2
-                && movement.groups.get(i).getFirst().trafficType != TrafficType.PEDESTRIAN) {
-            Sensor last = movement.sensors.get(i).getLast();
-            // We can't just use the last index if the traffic type is bidirection and we
-            // are looking at the !reverse case
-            if (movement.groups.get(i).getFirst().trafficType.isBidirectional() && !reverse) {
-                // So we instead get the index of the first reverse sensor and subtract 1 to get
-                // the last normal sensor
-                last = movement.sensors.get(i).get(movement.sensorReverseStartIndices.get(i) - 1);
-            }
-
-            // == 1 to confirm it's not a queue sensor (well for most cases)
-            if (abs(last.nodeIndexStart - last.nodeIndexEnd) == 1) {
-                detectedCount.insert(last.detectedCount);
-            }
+        Sensor sensor = movement.getSensor(SensorType.FAR, i, reverse);
+        if (sensor != null) {
+            detectedCount.insert(sensor.detectedCount);
         }
 
         Option<Integer> queueSensor = new Option<>();
-        if (movement.sensors.get(i).size() >= 2 && !movement.groups.get(i).getFirst().trafficType.isVulnerable()) {
-            Sensor second = movement.sensors.get(i).get(1);
-            // >= 2 to confirm it's a queue sensor
-            if (abs(second.nodeIndexStart - second.nodeIndexEnd) >= 2) {
-                queueSensor.insert(1);
-            }
+        sensor = movement.getSensor(SensorType.QUEUE, i, reverse);
+        if (sensor != null) {
+            queueSensor.insert(sensor.detected ? 1 : 0);
         }
 
         possibleGreens.put(entry, new Weights(trafficType, waitTime, timeUntilGreen, detectedCount, queueSensor));
@@ -262,18 +262,20 @@ class iVRI extends PComponent {
             return;
 
         // If a sensor has too recently been detected, can't turn yellow
-        for (Sensor sensor : movement.sensors.get(index)) {
-            if (sensor.reverse != reverse)
-                continue;
-            if (sensor.detected)
-                return;
+        if (!movement.isPedestrian() || (movement.isPedestrian() && movement.useRadar)) {
+            for (Sensor sensor : movement.sensors.get(index)) {
+                if (sensor.reverse != reverse)
+                    continue;
+                if (sensor.detected)
+                    return;
 
-            int timeSinceDetection = frameCount - sensor.lastDetectedFrame;
-            float threshold = max(Settings.noDetectionTime, sensor.distanceFromEndToIntersection
-                    / movement.groups.get(index).getFirst().trafficType.getMaxSpeed() * frameRate);
+                int timeSinceDetection = frameCount - sensor.lastDetectedFrame;
+                float threshold = max(Settings.noDetectionTime, sensor.distanceFromEndToIntersection
+                        / movement.groups.get(index).getFirst().trafficType.getMaxSpeed() * frameRate);
 
-            if (timeSinceDetection < threshold) {
-                return;
+                if (timeSinceDetection < threshold) {
+                    return;
+                }
             }
         }
 
@@ -406,34 +408,71 @@ class iVRI extends PComponent {
             // Look at the start anchor, make a list of all other segments that share that
             // start anchor and have a collision with something else hasCollision(, true).
             // Add all of these to the first group and don't bother with 2 stages
-            HashSet<Segment> segments = new HashSet<>();
+            HashSet<Segment> segmentsNonOV = new HashSet<>();
+            HashSet<Segment> segmentsOV = new HashSet<>();
             for (Segment s : segment.startAnchor.beginSegments) {
                 if (s == segment)
                     continue;
 
-                if (hasCollision(s, true))
-                    segments.add(s);
+                if (hasCollision(s, true) && !addedSegments.contains(s) && s.trafficType != TrafficType.MEDIAN) {
+                    if (s.trafficType == TrafficType.OV)
+                        segmentsOV.add(s);
+                    else
+                        segmentsNonOV.add(s);
+                }
             }
-            if (!segments.isEmpty()) {
-                editingMovement.groups.get(0).addAll(segments);
-                addedSegments.addAll(segments);
-                continue;
+
+            if (!segmentsNonOV.isEmpty() || !segmentsOV.isEmpty()) {
+                if (segmentsOV.isEmpty() && segment.trafficType != TrafficType.OV) {
+                    editingMovement.groups.get(0).addAll(segmentsNonOV);
+                    addedSegments.addAll(segmentsNonOV);
+                    editingMovement.populateAllMovements();
+                    continue;
+                } else {
+                    editingMovement.groups.get(0).clear();
+
+                    if (segment.trafficType == TrafficType.OV)
+                        segmentsOV.add(segment);
+                    else
+                        segmentsNonOV.add(segment);
+
+                    editingMovement.groups.get(0).addAll(segmentsOV);
+
+                    // Make new group
+                    Panel panel = panelsMovementSegments.get(editingMovement.id);
+                    Button button = createNewGroup(editingMovement, panel, (Button) panel.getElements().getFirst(),
+                            (Button) panel.getElements().get(1));
+                    button.onClick();
+
+                    editingMovement.groups.get(1).addAll(segmentsNonOV);
+                    // Set forceWait to false
+                    ((Button) panelsMovementNames.getLast().getElements().getLast()).onClick();
+
+                    addedSegments.addAll(segmentsOV);
+                    addedSegments.addAll(segmentsNonOV);
+                    editingMovement.populateAllMovements();
+                    continue;
+                }
             }
 
             // Multiple stages
             Segment current = segment;
             while (current.segmentsNext.size() == 1) {
                 current = current.segmentsNext.iterator().next();
-                if (!hasCollision(current, true))
+                if (addedSegments.contains(current) || !hasCollision(current, true)
+                        || current.trafficType == TrafficType.MEDIAN)
                     break;
 
                 Panel panel = panelsMovementSegments.get(editingMovement.id);
-                Button button = createNewGroup(editingMovement, panel, (Button) panel.getElements().getFirst());
+                Button button = createNewGroup(editingMovement, panel, (Button) panel.getElements().getFirst(),
+                        (Button) panel.getElements().get(1));
                 button.onClick();
 
                 editingMovement.groups.getLast().add(current);
                 addedSegments.add(current);
             }
+            editingMovement.populateAllMovements();
+
             // Diagnosis report after multiple stages for a scenario that couldn't be
             // resolved automatically
             if (current.segmentsNext.size() == 2) {
@@ -672,7 +711,7 @@ class iVRI extends PComponent {
         nameAndWait.addElement(forceWait);
         panelsMovementNames.add(nameAndWait);
 
-        int numButtons = movement.groups.size() + 1;
+        int numButtons = movement.groups.size() + 2;
         w = buttonWidth * numButtons + margin * (numButtons - 1) + margin * 2;
         Panel movementsPanel = new Panel(nameAndWait.pos.x + nameAndWait.size.x / 2 + marginPanel + w / 2, y, w,
                 buttonWidth + margin * 2).setCornerRadius(0);
@@ -682,18 +721,34 @@ class iVRI extends PComponent {
             x += buttonWidth + margin;
         }
 
+        // New movement
         Button newMovement = new Button(x, 0, buttonWidth, buttonWidth, "+");
+        movementsPanel.addElement(newMovement);
+
+        x += buttonWidth + margin;
+
+        // Delete movement
+        Button deleteMovement = new Button(x, 0, buttonWidth, buttonWidth, "X");
+        deleteMovement.onClick(new Runnable() {
+            @Override
+            public void run() {
+                toDeleteMovement = movement;
+                toDeleteMovementsPanel = movementsPanel;
+            }
+        });
+        movementsPanel.addElement(deleteMovement);
+
+        // New movement on click
         newMovement.onClick(new Runnable() {
             @Override
             public void run() {
-                createNewGroup(movement, movementsPanel, newMovement);
+                createNewGroup(movement, movementsPanel, newMovement, deleteMovement);
             }
         });
-        movementsPanel.addElement(newMovement);
 
         // If groups = 0, then we already make the first one and select it
         if (movement.groups.size() == 0) {
-            Button newGroup = createNewGroup(movement, movementsPanel, newMovement);
+            Button newGroup = createNewGroup(movement, movementsPanel, newMovement, deleteMovement);
             newGroup.onClick();
         }
 
@@ -702,16 +757,49 @@ class iVRI extends PComponent {
         buttonAddMovement.pos.y += nameAndWait.size.y + marginPanel;
     }
 
-    private Button createNewGroup(Movement movement, Panel movementsPanel, Button newMovement) {
+    private Button createNewGroup(Movement movement, Panel movementsPanel, Button newMovement, Button deleteMovement) {
         movement.groups.add(new ArrayList<>());
         Button button = createMovementButton(movementsPanel, movement, movement.groups.size() - 1,
                 newMovement.pos.copy().sub(movementsPanel.pos));
         newMovement.pos.x += buttonWidth + margin;
+        deleteMovement.pos.x += buttonWidth + margin;
         movementsPanel.size.x += buttonWidth + margin;
         movementsPanel.pos = new PVector(movementsPanel.pos.x + (buttonWidth + margin) / 2,
                 movementsPanel.pos.y);
 
         return button;
+    }
+
+    private void deleteMovement(Movement movement, Panel movementsPanel) {
+        // Remove segments from segmentMovementsMap
+        for (Segment segment : movement.allMovements) {
+            if (segmentMovementsMap.containsKey(segment))
+                segmentMovementsMap.remove(segment);
+        }
+
+        PVector posChange = new PVector(0, sketch.modePanel.size.y / 2 + marginPanel + margin + buttonWidth / 2);
+
+        // Remove the panel
+        movementsPanel.setActive(false);
+        movementsPanel.delete();
+        int index = panelsMovementSegments.indexOf(movementsPanel);
+        panelsMovementSegments.remove(index);
+        panelsMovementNames.remove(index);
+
+        // Slide all of the other panels down
+        for (int i = index; i < panelsMovementSegments.size(); i++) {
+            panelsMovementSegments.get(i).setPos(PVector.sub(panelsMovementSegments.get(i).pos, posChange));
+            panelsMovementNames.get(i).setPos(PVector.sub(panelsMovementNames.get(i).pos, posChange));
+        }
+        buttonAddMovement.setPos(PVector.sub(buttonAddMovement.pos, posChange));
+
+        // Remove the movement
+        if (editingMovement == movement) {
+            editingMovement = null;
+            editingMovementGroupIndex = 0;
+        }
+        movements.remove(movement);
+        movement = null;
     }
 
     private Button createMovementButton(Panel panel, Movement movement, int index, PVector pos) {
@@ -785,7 +873,8 @@ class iVRI extends PComponent {
                 return;
 
             Panel panel = panelsMovementSegments.get(movement.id);
-            Button button = createNewGroup(movement, panel, (Button) panel.getElements().getFirst());
+            Button button = createNewGroup(movement, panel, (Button) panel.getElements().getFirst(),
+                    (Button) panel.getElements().get(1));
             button.onClick();
         } else if (key == 'e') {
             automaticallyAssignMovements();

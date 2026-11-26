@@ -4,6 +4,7 @@ import java.awt.geom.Line2D;
 
 class Sensor extends PComponent implements EventIgnorer, Saveable {
     int id;
+    SensorType type;
     int nodeIndexStart;
     int nodeIndexEnd;
     HashSet<Segment> segments = new HashSet<>();
@@ -18,9 +19,10 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
     PVector pos;
     float length, rotation;
 
-    public Sensor(int id, int nodeIndexStart, int nodeIndexEnd, float distanceFromEndToIntersection,
+    public Sensor(int id, SensorType type, int nodeIndexStart, int nodeIndexEnd, float distanceFromEndToIntersection,
             Segment... segments) {
         this.id = id;
+        this.type = type;
         this.nodeIndexStart = nodeIndexStart;
         this.nodeIndexEnd = nodeIndexEnd;
         this.distanceFromEndToIntersection = distanceFromEndToIntersection;
@@ -144,15 +146,18 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
         rotate(rotation);
 
         if (detected) {
-            noStroke();
-            fill(255, 100);
+            fill(255, 180);
         } else {
-            stroke(0, 100);
-            strokeWeight(3);
             noFill();
         }
+        stroke(0, 100);
+        strokeWeight(2);
 
-        rect(0, 0, length, segments.iterator().next().segmentWidth * 0.9);
+        float segmentWidth = segments.iterator().next().segmentWidth;
+        float sensorWidth = segmentWidth * 0.7f;
+        if (type == SensorType.QUEUE)
+            sensorWidth = segmentWidth * 0.4f;
+        rect(0, 0, length, sensorWidth);
 
         pop();
     }
@@ -166,6 +171,7 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
         String output = "";
 
         output += id + "\n";
+        output += type + "\n";
         output += nodeIndexStart + "\n";
         output += nodeIndexEnd + "\n";
         output += detected + "\n";
@@ -199,6 +205,9 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
             int id = Integer.parseInt(data[count]);
             count++;
 
+            SensorType type = SensorType.valueOf(data[count]);
+            count++;
+
             int nodeIndexStart = Integer.parseInt(data[count]);
             count++;
 
@@ -226,7 +235,7 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
             HashSet<Segment> segments = getSegments(sketch, data[count]);
             count++;
 
-            Sensor sensor = new Sensor(id, nodeIndexStart, nodeIndexEnd, distanceFromEndToIntersection,
+            Sensor sensor = new Sensor(id, type, nodeIndexStart, nodeIndexEnd, distanceFromEndToIntersection,
                     (Segment[]) segments.toArray(new Segment[0]));
             sensor.setReverse(reverse);
             sensor.pos = pos;

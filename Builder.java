@@ -1023,6 +1023,8 @@ class Builder extends PComponent {
     public void keyPressed() {
         if (key == 'p') {
             drawRoads = !drawRoads;
+        } else if (key == ' ' && keysPressed.contains("Ctrl")) {
+            referenceImageShow = !referenceImageShow;
         }
 
         if (sketch.mode != SimulationMode.BUILD)
@@ -1104,8 +1106,6 @@ class Builder extends PComponent {
             referenceImageOffset.add(25, 0);
         } else if (keyString.equals("Right") && keysPressed.contains("Ctrl")) {
             referenceImageOffset.add(-25, 0);
-        } else if (key == ' ' && keysPressed.contains("Ctrl")) {
-            referenceImageShow = !referenceImageShow;
         }
     }
 

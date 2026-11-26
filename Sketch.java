@@ -77,10 +77,11 @@ class Sketch extends Applet {
         builder.update();
         builder.show();
 
+        trafficManager.show();
+
         if (running && mode == SimulationMode.SIMULATE) {
             trafficManager.update(iVRI);
         }
-        trafficManager.show();
 
         iVRI.setActiveUI(mode == SimulationMode.LIGHT);
         iVRI.update();

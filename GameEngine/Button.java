@@ -5,6 +5,7 @@ import library.core.*;
 public class Button extends Interactable {
 
     private Runnable onClick;
+    private Runnable onMouseReleased;
 
     // Defaults
     private static Button defaultButton = new Button(0, 0, 300, 100, new color(200), new color(230), new color(180),
@@ -56,6 +57,7 @@ public class Button extends Interactable {
         Button copy = new Button(pos.copy(), size.copy(), defaultColor.copy(), hoverColor.copy(), activeColor.copy(),
                 strokeColor.copy(), new String(text), textSize, textColor.copy());
         copy.onClick(onClick);
+        copy.onMouseReleased(onMouseReleased);
         copy.onHover(onHover);
         copy.onHoverExit(onHoverExit);
         copy.setCornerRadius(cornerRadius);
@@ -79,6 +81,7 @@ public class Button extends Interactable {
         textSize = button.textSize;
         textColor = button.textColor.copy();
         onClick = button.onClick;
+        onMouseReleased = button.onMouseReleased;
         onHover = button.onHover;
         onHoverExit = button.onHoverExit;
         cornerRadius = button.cornerRadius;
@@ -119,9 +122,25 @@ public class Button extends Interactable {
             onClick.run();
     }
 
+    public Button onMouseReleased(Runnable onMouseReleased) {
+        this.onMouseReleased = onMouseReleased;
+        return this;
+    }
+
+    public void onMouseReleased() {
+        if (onMouseReleased != null) {
+            onMouseReleased.run();
+        }
+    }
+
     public void mousePressed() {
         if (interactive && active && mouseButton == LEFT && hover())
             onClick();
+    }
+
+    public void mouseReleased() {
+        if (interactive && active && mouseButton == LEFT && hover())
+            onMouseReleased();
     }
 
     public void draw() {

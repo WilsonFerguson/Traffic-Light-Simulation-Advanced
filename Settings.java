@@ -8,7 +8,7 @@ class Settings extends PFunctions {
     /**
      * Statistically, how many seconds between each spawn of a road user.
      */
-    public static float trafficSpawnInterval = 2.5f;
+    public static float trafficSpawnInterval = 2.0f;
     public static int maxTraffic = 100;
     public static float OVSpawnChance = 0.065f;
     /**
@@ -73,6 +73,10 @@ class Settings extends PFunctions {
     public static float yellowTime = 2.5f;
     public static float greenTimeMinimum = 4f;
     public static float redTimeMinimum = 1f;
+    /**
+     * How long the light must be red before the kopLus is used
+     */
+    public static float minimumRedTimeBeforeDetection = 0.5f;
 
     public static color lightGreen = new color(0, 135, 84);
     public static color lightYellow = new color(247, 181, 0);
