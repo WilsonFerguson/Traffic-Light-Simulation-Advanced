@@ -159,7 +159,6 @@ class Sketch extends Applet {
                         // If the Phases button was never clicked in iVRI but there are groups, then
                         // call the initial iVRI setup method
                         if (iVRI.movements.size() != 0 && iVRI.segmentMovementsMap.isEmpty()) {
-                            println("Automatically \"pressing\" the Phases button");
                             iVRI.calculateMovementDetails();
                         }
                     }

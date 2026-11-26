@@ -51,11 +51,6 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
             if (!segments.contains(user.currentSegment) || user.segmentReverse != reverse)
                 continue;
 
-            if (!reverse && user.targetSegmentIndex > nodeIndexEnd + 2)
-                continue;
-            if (reverse && user.targetSegmentIndex < nodeIndexEnd - 2)
-                continue;
-
             PVector carStart = PVector.add(user.pos, PVector.fromAngle(user.heading).mult(user.length / 2));
             PVector carEnd = PVector.add(user.pos, PVector.fromAngle(user.heading).mult(-user.length / 2));
             if (isOverlapping(sensorStart, sensorEnd, carStart, carEnd, user.width)) {
@@ -157,7 +152,13 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
         float sensorWidth = segmentWidth * 0.7f;
         if (type == SensorType.QUEUE)
             sensorWidth = segmentWidth * 0.4f;
-        rect(0, 0, length, sensorWidth);
+
+        if (segments.iterator().next().trafficType == TrafficType.BIKE_2WAY) {
+            rect(length / 4 + 1, 0, length / 2 - 1, sensorWidth);
+            rect(-length / 4 - 1, 0, length / 2 - 1, sensorWidth);
+        } else {
+            rect(0, 0, length, sensorWidth);
+        }
 
         pop();
     }

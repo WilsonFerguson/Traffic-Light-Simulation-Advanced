@@ -113,10 +113,12 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         if (sensors != null) {
             for (int key : sensors.keySet()) {
                 for (Sensor sensor : sensors.get(key)) {
-                    if (sensor.type == SensorType.HEAD && signals.get(key).get(sensor.reverse) == Signal.RED
-                            && frameCount
-                                    - signalStartTimes.get(key).get(sensor.reverse) < round(
-                                            Settings.minimumRedTimeBeforeDetection * frameRate))
+                    boolean signalRed = signals.get(key).get(sensor.reverse) == Signal.RED;
+                    boolean longEnoughSinceRed = frameCount - signalStartTimes.get(key).get(sensor.reverse) < round(
+                            Settings.minimumRedTimeBeforeDetection * frameRate);
+                    boolean notAtStartOfSimulation = signalStartTimes.get(key)
+                            .get(sensor.reverse) != -Integer.MAX_VALUE;
+                    if (sensor.type == SensorType.HEAD && signalRed && longEnoughSinceRed && notAtStartOfSimulation)
                         continue;
 
                     sensor.detect();
@@ -777,6 +779,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         if (start < minGapNodes + minLengthNodes) {
             if (segment.segmentsPrevious.size() != 1)
                 return;
+            Segment lastUsedSegment = segment;
             segment = segment.segmentsPrevious.iterator().next();
             if (segment.segmentsNext.size() != 1)
                 return;
@@ -787,12 +790,10 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
             start += segment.path.size();
             // TODO: this distance is for sure correct if groups.get(i).size() == 1, but if
             // it's > 1 I'm not sure this is right because then the end = 1 instead of
-            // entranceNode
-
-            // TODO: um this distance isn't fully correct because the spacing between nodes
-            // isn't always exactly this distance... every place where I do this needs to be
-            // changed then
-            distance = Settings.distanceToNodeThreshold * entranceNodes.get(arrayIndex);
+            // entranceNode. So then I imagine i = 1 should be the start of the for loop
+            for (int i = 0; i < entranceNodes.get(arrayIndex); i++) {
+                distance += lastUsedSegment.path.get(i).dist(lastUsedSegment.path.get(i + 1));
+            }
             movedToNextSegment = true;
         }
 
@@ -802,12 +803,17 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         int end = start + maxLengthNodes;
         end = min(end, nextStart - minGapNodes);
         end = min(end, segment.path.size() - 1);
-        if (movedToNextSegment)
-            distance += Settings.distanceToNodeThreshold * (segment.path.size() - 1 - end);
-        else
+        if (!movedToNextSegment) {
             // nextStart + 1 is just the end of the kopLus (because it has a length of 1
             // node)
-            distance += Settings.distanceToNodeThreshold * (nextStart + 1 - end);
+            for (int i = end; i < nextStart + 1; i++) {
+                distance += segment.path.get(i).dist(segment.path.get(i + 1));
+            }
+        } else {
+            for (int i = end; i < segment.path.size() - 1; i++) {
+                distance += segment.path.get(i).dist(segment.path.get(i + 1));
+            }
+        }
         sensors.get(arrayIndex).add(createSensor(SensorType.QUEUE, start, end, distance, segment));
 
         // The farthest out sensor should be another 50m from the start of the queue
@@ -815,12 +821,39 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
         int previousEnd = end;
         int numNodes = round(50 * Settings.pixelsPerMeter / Settings.distanceToNodeThreshold);
         int minNumNodes = round(12 * Settings.pixelsPerMeter / Settings.distanceToNodeThreshold);
-        if (start < minNumNodes)
-            return;
+
+        movedToNextSegment = false;
+        if (start < minNumNodes) {
+            if (segment.segmentsPrevious.size() != 1)
+                return;
+            Segment lastUsedSegment = segment;
+            segment = segment.segmentsPrevious.iterator().next();
+            if (segment.segmentsNext.size() != 1)
+                return;
+
+            // +2 to take into account the fact that they share one common node that should
+            // be ignored and because start must be at least at index 1
+            if (segment.path.size() < minNumNodes - start + 2)
+                return;
+
+            for (int i = 0; i < start; i++) {
+                distance += lastUsedSegment.path.get(i).dist(lastUsedSegment.path.get(i + 1));
+            }
+            start += segment.path.size() - 1;
+            movedToNextSegment = true;
+        }
         end = start - numNodes;
         end = max(end, 2);
         start = end - 1;
-        distance += Settings.distanceToNodeThreshold * (previousEnd - end);
+        if (!movedToNextSegment) {
+            for (int i = end; i < previousEnd; i++) {
+                distance += segment.path.get(i).dist(segment.path.get(i + 1));
+            }
+        } else {
+            for (int i = end; i < segment.path.size() - 1; i++) {
+                distance += segment.path.get(i).dist(segment.path.get(i + 1));
+            }
+        }
         sensors.get(arrayIndex).add(createSensor(SensorType.FAR, start, end, distance, segment));
     }
 
@@ -836,7 +869,10 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                     if (segment.segmentsNext.size() != 1)
                         return;
 
-                    distance += Settings.distanceToNodeThreshold * (segment.path.size() - start);
+                    // start - 1 is the end of the sensor
+                    for (int i = start - 1; i < segment.path.size() - 1; i++) {
+                        distance += segment.path.get(i).dist(segment.path.get(i + 1));
+                    }
                     segment = segment.segmentsNext.iterator().next();
 
                     if (allMovements.contains(segment))
@@ -851,7 +887,9 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                 start = start + maxGapNodes + 1;
                 start = min(start, segment.path.size() - 1);
                 int end = start - 1;
-                distance += Settings.distanceToNodeThreshold * (end - nextStart);
+                for (int i = nextStart; i < end; i++) {
+                    distance += segment.path.get(i).dist(segment.path.get(i + 1));
+                }
                 Sensor sensor = createSensor(SensorType.FAR, start, end, distance, segment);
                 sensor.setReverse(true);
                 sensors.get(index).add(sensor);
@@ -867,6 +905,7 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                 if (start < minGapNodes + 1) {
                     if (segment.segmentsPrevious.size() != 1)
                         return;
+                    Segment lastUsedSegment = segment;
                     segment = segment.segmentsPrevious.iterator().next();
 
                     if (allMovements.contains(segment))
@@ -875,7 +914,9 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                         return;
 
                     start += segment.path.size();
-                    distance = Settings.distanceToNodeThreshold * entranceNodes.get(index);
+                    for (int i = 0; i < entranceNodes.get(index); i++) {
+                        distance += lastUsedSegment.path.get(i).dist(lastUsedSegment.path.get(i + 1));
+                    }
                     movedToNextSegment = true;
                 }
 
@@ -883,12 +924,18 @@ class Movement extends PComponent implements EventIgnorer, Saveable {
                 start = start - maxGapNodes - 1;
                 start = max(start, 0);
                 int end = start + 1;
-                if (movedToNextSegment)
-                    distance += Settings.distanceToNodeThreshold * (segment.path.size() - 1 - end);
-                else
+
+                if (!movedToNextSegment) {
                     // nextStart + 1 is just the end of the kopLus (because it has a length of 1
                     // node)
-                    distance += Settings.distanceToNodeThreshold * (nextStart + 1 - end);
+                    for (int i = end; i < nextStart + 1; i++) {
+                        distance += segment.path.get(i).dist(segment.path.get(i + 1));
+                    }
+                } else {
+                    for (int i = end; i < segment.path.size() - 1; i++) {
+                        distance += segment.path.get(i).dist(segment.path.get(i + 1));
+                    }
+                }
 
                 sensors.get(index).add(createSensor(SensorType.FAR, start, end, distance, segment));
             } else {

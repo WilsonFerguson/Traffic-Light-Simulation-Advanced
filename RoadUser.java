@@ -134,7 +134,6 @@ class RoadUser extends PComponent implements EventIgnorer {
         // TODO: consider other segments that just cross ours
         // AND: consider the width of the segment for determining where to stop
 
-        // TODO: stopping at red lights
         appliedAcceleration = min(appliedAcceleration, stopForTrafficLight(iVRI));
 
         dt = 1 / frameRate;
@@ -396,8 +395,9 @@ class RoadUser extends PComponent implements EventIgnorer {
             return Float.MAX_VALUE;
 
         // So it's either been yellow for too long or it's red, so we have to stop
-        float stoppingDistance = PVector.add(pos, PVector.fromAngle(heading).mult(1.2 * length / 2))
-                .dist(getOffsetNode(kopLus.nodeIndexEnd));
+        PVector front = PVector.add(pos, PVector.fromAngle(heading).mult(1.2 * length / 2));
+        PVector stopLine = getOffsetNode(kopLus.nodeIndexEnd);
+        float stoppingDistance = front.dist(stopLine);
 
         // If we are close enough then we can start slowing down (within __ seconds)
         float threshold = speed * 4;
@@ -407,6 +407,11 @@ class RoadUser extends PComponent implements EventIgnorer {
 
         float a = pow(speed, 2) / (2 * stoppingDistance);
         stopping = true;
+
+        float distanceAlongHeading = PVector.sub(stopLine, front).dot(PVector.fromAngle(heading));
+        if (distanceAlongHeading <= 0)
+            return -Float.MAX_VALUE;
+
         return -abs(a);
     }
 
