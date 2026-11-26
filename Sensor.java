@@ -132,35 +132,67 @@ class Sensor extends PComponent implements EventIgnorer, Saveable {
     }
 
     public void show() {
-        // length == 0 for pedestrians so we obviously don't draw the sensor
-        if (length == 0)
-            return;
-
-        push();
-        translate(pos);
-        rotate(rotation);
-
         if (detected) {
             fill(255, 180);
         } else {
             noFill();
         }
-        stroke(0, 100);
+        stroke(50);
         strokeWeight(2);
 
-        float segmentWidth = segments.iterator().next().segmentWidth;
+        Segment segment = segments.iterator().next();
+        float segmentWidth = segment.segmentWidth;
         float sensorWidth = segmentWidth * 0.7f;
         if (type == SensorType.QUEUE)
             sensorWidth = segmentWidth * 0.4f;
 
-        if (segments.iterator().next().trafficType == TrafficType.BIKE_2WAY) {
-            rect(length / 4 + 1, 0, length / 2 - 1, sensorWidth);
-            rect(-length / 4 - 1, 0, length / 2 - 1, sensorWidth);
+        if (type == SensorType.QUEUE) {
+            beginShape();
+
+            // There
+            for (int i = nodeIndexStart; i < nodeIndexEnd; i++) {
+                PVector node = segment.path.get(i);
+                PVector next = segment.path.get(i + 1);
+
+                PVector offset = PVector.sub(next, node).normalize().rotate(-PI / 2).mult(sensorWidth / 2);
+                vertex(PVector.add(node, offset));
+
+                // Finish out this line by adding the same offset to the final node. This is
+                // okay because the exit paths are always straight
+                if (i == nodeIndexEnd - 1) {
+                    vertex(PVector.add(next, offset));
+                }
+            }
+
+            // Back
+            for (int i = nodeIndexEnd; i > nodeIndexStart; i--) {
+                PVector node = segment.path.get(i);
+                PVector next = segment.path.get(i - 1);
+
+                PVector offset = PVector.sub(next, node).normalize().rotate(-PI / 2).mult(sensorWidth / 2);
+                vertex(PVector.add(node, offset));
+
+                // Finish out this line by adding the same offset to the final node. This is
+                // okay because the exit paths are always straight
+                if (i == nodeIndexStart + 1) {
+                    vertex(PVector.add(next, offset));
+                }
+            }
+            endShape(CLOSE);
         } else {
-            rect(0, 0, length, sensorWidth);
+            push();
+            translate(pos);
+            rotate(rotation);
+
+            if (segments.iterator().next().trafficType == TrafficType.BIKE_2WAY) {
+                rect(length / 4 + 1, 0, length / 2 - 1, sensorWidth);
+                rect(-length / 4 - 1, 0, length / 2 - 1, sensorWidth);
+            } else {
+                rect(0, 0, length, sensorWidth);
+            }
+            pop();
         }
 
-        pop();
     }
 
     @Override

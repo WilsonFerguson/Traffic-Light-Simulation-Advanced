@@ -152,27 +152,31 @@ class RoadUser extends PComponent implements EventIgnorer {
     }
 
     private PVector getOffsetNode(int index) {
-        PVector node = currentSegment.getNode(index).copy();
+        return getOffsetNode(currentSegment, index);
+    }
+
+    private PVector getOffsetNode(Segment segment, int index) {
+        PVector node = segment.getNode(index).copy();
         if (!type.isVulnerable())
             return node;
 
         float trueHeading = 0;
         if (!segmentReverse) {
-            if (index < currentSegment.path.size() - 1) {
-                trueHeading = PVector.sub(currentSegment.getNode(index + 1), currentSegment.getNode(index)).heading();
+            if (index < segment.path.size() - 1) {
+                trueHeading = PVector.sub(segment.getNode(index + 1), segment.getNode(index)).heading();
             } else {
-                trueHeading = PVector.sub(currentSegment.getNode(index), currentSegment.getNode(index - 1)).heading();
+                trueHeading = PVector.sub(segment.getNode(index), segment.getNode(index - 1)).heading();
             }
         } else {
             if (index > 0) {
-                trueHeading = PVector.sub(currentSegment.getNode(index - 1), currentSegment.getNode(index)).heading();
+                trueHeading = PVector.sub(segment.getNode(index - 1), segment.getNode(index)).heading();
             } else {
-                trueHeading = PVector.sub(currentSegment.getNode(index), currentSegment.getNode(index + 1)).heading();
+                trueHeading = PVector.sub(segment.getNode(index), segment.getNode(index + 1)).heading();
             }
         }
 
         if (type == TrafficType.BIKE_2WAY || type == TrafficType.PEDESTRIAN) {
-            node.add(PVector.fromAngle(trueHeading + PI / 2).setMag(currentSegment.segmentWidth / 4));
+            node.add(PVector.fromAngle(trueHeading + PI / 2).setMag(segment.segmentWidth / 4));
         }
 
         trueHeading += (PI / 2) * laneOffset;
@@ -181,7 +185,7 @@ class RoadUser extends PComponent implements EventIgnorer {
             divisor = 8;
         else if (type == TrafficType.PEDESTRIAN)
             divisor = 6;
-        node.add(PVector.fromAngle(trueHeading).setMag(currentSegment.segmentWidth / divisor));
+        node.add(PVector.fromAngle(trueHeading).setMag(segment.segmentWidth / divisor));
 
         return node;
     }
@@ -340,13 +344,26 @@ class RoadUser extends PComponent implements EventIgnorer {
      * and red lights
      */
     private float stopForTrafficLight(iVRI iVRI) {
-        Movement movement = iVRI.getMovement(currentSegment);
-        if (movement == null)
-            return Float.MAX_VALUE;
+        boolean certainlyBehindStopline = false;
+        Segment segment = currentSegment;
+        Movement movement = iVRI.getMovement(segment);
+
+        if (movement == null) {
+            certainlyBehindStopline = true;
+            while (true) {
+                if (segment.segmentsNext.size() != 1)
+                    return Float.MAX_VALUE;
+
+                segment = segment.segmentsNextOptions.iterator().next();
+                movement = iVRI.getMovement(segment);
+                if (movement != null)
+                    break;
+            }
+        }
 
         // Conceptually groups.size() should always be 1 I think, so the below for loops
         // aren't really necessary but we do it to be complete
-        HashSet<Integer> groups = iVRI.getGroups(currentSegment);
+        HashSet<Integer> groups = iVRI.getGroups(segment);
         Signal signal = null;
 
         // Here we will just use the first index in the group because it's easier in
@@ -358,9 +375,11 @@ class RoadUser extends PComponent implements EventIgnorer {
         else
             kopLus = movement.sensors.get(index).get(0);
 
-        if ((segmentReverse && targetSegmentIndex < kopLus.nodeIndexEnd)
-                || (!segmentReverse && targetSegmentIndex > kopLus.nodeIndexEnd))
-            return Float.MAX_VALUE;
+        if (!certainlyBehindStopline) {
+            if ((segmentReverse && targetSegmentIndex < kopLus.nodeIndexEnd)
+                    || (!segmentReverse && targetSegmentIndex > kopLus.nodeIndexEnd))
+                return Float.MAX_VALUE;
+        }
 
         float yellowSoFar = 0;
         // We look at pedestrians specifically because they would look at either reverse
@@ -396,7 +415,10 @@ class RoadUser extends PComponent implements EventIgnorer {
 
         // So it's either been yellow for too long or it's red, so we have to stop
         PVector front = PVector.add(pos, PVector.fromAngle(heading).mult(1.2 * length / 2));
-        PVector stopLine = getOffsetNode(kopLus.nodeIndexEnd);
+        PVector stopLine = getOffsetNode(segment, kopLus.nodeIndexEnd);
+
+        // TODO: this distance is fine for most cases but definitely could break down
+        // for very windy roads that sort of do a 180 and loop back
         float stoppingDistance = front.dist(stopLine);
 
         // If we are close enough then we can start slowing down (within __ seconds)
